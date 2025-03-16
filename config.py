@@ -4,16 +4,11 @@ from pathlib import Path
 from datetime import datetime
 import os
 
-#case1 A股的电力ETF
-GPCODE = "561560.SH"     #
-STOCK_TYPE = "ETF"         #ETF指数配置为ETF, 其他为空
 
-# 获取项目根目录（当前文件所在目录的父目录）
+#数据存储目录（相对于项目根目录）
 BASE_DIR = Path(__file__).resolve().parent
-
-# 数据存储目录（相对于项目根目录）
 DATA_DIR = BASE_DIR / "stock_data"
-START_TIME = "2025-01-01 09:30:00"
+START_TIME = "2024-09-20 09:30:00"
 
 class ETFConfig:
     DEFAULT_PERIODS = ['5', '15', '30', '60']
