@@ -70,7 +70,7 @@ class DeepSeekAnalyzer:
             data_sample = df.tail(50)
             data_str = data_sample.to_markdown()
             data_summary = f"数据时间范围：{df['DateTime'].min()} 至 {df['DateTime'].max()}"
-            print("content" + f"{user_prompt}\n{data_summary}\n样本数据：\n{data_str}")
+            #print("content" + f"{user_prompt}\n{data_summary}\n样本数据：\n{data_str}")
 
             print("------------process_response 开始--------------------")
 
@@ -97,7 +97,7 @@ class DeepSeekAnalyzer:
             response_data = response.json()
 
             temp = self._process_response(response_data)
-            print("------------_process_response 完成--------------------")
+            #print("------------_process_response 完成--------------------")
             #print(temp)
 
             return temp
@@ -141,7 +141,7 @@ class DeepSeekAnalyzer:
 
 
 # 使用示例
-def r1test():
+def r1test(code):
     # 1. 配置参数
     config = DeepSeekConfig(
         api_key="sk-muzyalwgqothjfvsdmzfdjsuiszgqvbgzsvijfteyoesaxdy",
@@ -151,7 +151,9 @@ def r1test():
     # 2. 加载数据
     loader = ETFDataLoader()
     #dataPath = "D:/code-touzi/gitHub/guPiaoJiaoYi/stock_data/588180/588180_Day.csv"
-    dataPath = "/content/guPiaoJiaoYi/stock_data/588180/588180_Day.csv"
+    #dataPath = "/content/guPiaoJiaoYi/stock_data/588180/588180_Day.csv"
+    dataPath = f"/content/guPiaoJiaoYi/stock_data/{code}/{code}_Day.csv"
+    #print(dataPath)
     df = loader.load_etf_data(file_path=dataPath)
 
     # 3. 创建分析器
@@ -187,4 +189,10 @@ def r1test():
        print("警告：分析结果可能不完整，建议缩小数据范围或简化问题")
 
 if __name__ == "__main__":
-    r1test()  # 直接调用同步函数
+    
+    print("-----------561560---------------")
+    r1test("561560")  # 直接调用同步函数
+    print("---------588180-----------------")
+    r1test("588180")
+    print("-----------159655----------")
+    r1test("159655")
