@@ -20,10 +20,10 @@ class DeepSeekConfig(BaseModel):
     """深度求索API配置"""
     api_key: str = Field(..., description="API密钥")
     base_url: str = "https://api.siliconflow.cn/v1"
-    system_prompt: str = "你是一位专业的ETF市场分析师和交易员,言辞犀利，语言精简, 根据用户提供的行情数据给出核心分析和2~5天的建议,默认成功率大于66%"
+    system_prompt: str = "你是一位专业的ETF市场分析师和交易员,市场成功率80%，短线之王，言辞犀利，语言精简, 根据用户提供的行情数据给出核心分析和2~5天的建议,默认成功率大于66%"
     model: str = Field("Pro/deepseek-ai/DeepSeek-R1", description="官方指定模型名称R1")  # 修正模型名称
     max_tokens: int = 4096  # 与官方示例一致
-    temperature: float = 0.2
+    temperature: float = 0.1
     top_p: float = 0.7
 
 
@@ -67,7 +67,7 @@ class DeepSeekAnalyzer:
         :return: 包含内容和推理内容的字典
         """
         try:
-            data_sample = df.tail(50)
+            data_sample = df.tail(80)
             data_str = data_sample.to_markdown()
             data_summary = f"数据时间范围：{df['DateTime'].min()} 至 {df['DateTime'].max()}"
             #print("content" + f"{user_prompt}\n{data_summary}\n样本数据：\n{data_str}")
@@ -241,13 +241,13 @@ ZD（中枢低点）= 重叠区间最低价
 扩展情形	中枢延伸≥9段时	按扩展中枢重新计算ZG/ZD
 
 
-### 2. 根据数据分析后，输出技术指标判断趋势（趋势指标、动量指标、市场情绪量化）,输出规范如下（（markdown格式））
+### 2. 根据数据分析技术指标判断趋势（趋势指标、动量指标、市场情绪量化）
 #### 2.1 趋势指标
 - **均线系统**：5/8/16日均线交叉状态（金叉/死叉/缠绕）
 - **MACD**：DIFF-DEA柱状体面积变化，重点观察跨中枢段的柱体背驰
 
 #### 2.2 动量指标
-- **RSI(14)**：超买(>70)/超卖(<30)区间持续时间
+- **RSI**：超买/超卖区间持续时间
 - **成交量验证**：突破关键位时量能是否达到20日均量150%
 
 ### 3. 市场情绪量化
@@ -292,7 +292,7 @@ ZD（中枢低点）= 重叠区间最低价
 
         #print("--------------推理内容-------------------------")
         #print("推理内容：", result["reasoning"])
-        
+
         print("--------------分析结果-------------------------")
 
         print("分析结果：", result["content"])
@@ -303,7 +303,7 @@ ZD（中枢低点）= 重叠区间最低价
 if __name__ == "__main__":
     
     print("-----------561560---------------")
-    #r1test("561560")  # 直接调用同步函数
+    r1test("561560")  # 直接调用同步函数
     print("---------588180-----------------")
     #r1test("588180")
     print("-----------159655----------")
