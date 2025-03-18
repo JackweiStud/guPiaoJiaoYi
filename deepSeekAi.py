@@ -150,7 +150,8 @@ def r1test():
 
     # 2. 加载数据
     loader = ETFDataLoader()
-    dataPath = "D:/code-touzi/gitHub/guPiaoJiaoYi/stock_data/588180/588180_Day.csv"
+    #dataPath = "D:/code-touzi/gitHub/guPiaoJiaoYi/stock_data/588180/588180_Day.csv"
+    dataPath = "/content/guPiaoJiaoYi/stock_data/588180/588180_Day.csv"
     df = loader.load_etf_data(file_path=dataPath)
 
     # 3. 创建分析器
@@ -160,9 +161,10 @@ def r1test():
     user_prompt = f"""
         一、将给你一段数据, 数据包括(DateTime,OpenValue,CloseValue,HighValue,LowValue,Volume,ChangeRate)
         二、可参考以下步骤分析：
-            1. 识别关键趋势 (使用缠论、均线、macd、RSI技术指标)
+            1. 识别关键趋势 (使用缠论（笔、顶底分型（涉及合并）、线段、中枢、3类买卖点）、均线、macd、RSI技术指标)
             2. 评估市场情绪 (基于成交量、换手率变化)
             3. 给出具体建议 (明确买卖区间、阻力、支持位)]
+            4. 结合你的实际策略，明确2~3天看多还是看空
         三、最终按照markDown格式输出, [注意：结论请用</分析结束>标记]"""
 
     result = analyzer.analyze_data(df, user_prompt)
