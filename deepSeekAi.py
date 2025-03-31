@@ -20,11 +20,11 @@ class DeepSeekConfig(BaseModel):
     """深度求索API配置"""
     api_key: str = Field(..., description="API密钥")
     base_url: str = "https://api.siliconflow.cn/v1"
-    system_prompt: str = "你是一位专业的ETF市场分析师和交易员,市场成功率80%，短线之王，言辞犀利，语言精简, 根据用户提供的行情数据给出核心分析和2~5天的建议,默认成功率大于66%"
+    system_prompt: str = "你是一位专业的、严谨的量化分析师,必须根据数据客观分析市场，成功率80%，短线之王，言辞犀利，语言精简, 根据用户提供的行情数据给出核心分析和2~5天的建议,默认成功率大于66%"
     model: str = Field("Pro/deepseek-ai/DeepSeek-R1", description="官方指定模型名称R1")  # 修正模型名称
     max_tokens: int = 4096  # 与官方示例一致
-    temperature: float = 0.1
-    top_p: float = 0.7
+    temperature: float = 0
+    top_p: float = 0
 
 
 
@@ -152,7 +152,7 @@ def r1test(code):
     loader = ETFDataLoader()
     #dataPath = "D:/code-touzi/gitHub/guPiaoJiaoYi/stock_data/588180/588180_Day.csv"
     #dataPath = "/content/guPiaoJiaoYi/stock_data/588180/588180_Day.csv"
-    dataPath = f"/content/guPiaoJiaoYi/stock_data/{code}/{code}_Day.csv"
+    dataPath = f"/content/drive/MyDrive/guPiaoJiaoYi/guPiaoJiaoYi/stock_data/{code}/{code}_Day.csv"
     #dataPath = f"/content/guPiaoJiaoYi/stock_data/{code}/{code}_60.csv"
     #print(dataPath)
     df = loader.load_etf_data(file_path=dataPath)
@@ -170,14 +170,12 @@ def r1test(code):
             4. 结合你的实际策略，明确2~3天看多还是看空
         三、最终按照markDown格式输出, [注意：结论请用</分析结束>标记]"""
     user_prompt = f"""
-    # A股数据分析和决策建议
-
-## 一、用户输入xxx股票的数据，格式如下：
+## 一、用户输入xxx股票的日线级别数据，格式如下：
 - **数据字段**：DateTime, OpenValue, CloseValue, HighValue, LowValue, Volume, ChangeRate
-- **数据要求**：按时间升序排列的日线级别数据
+- **数据已按时间升序排列
 
 ## 二、请按照下面的流程进行多维度、技术点、详细、迭代分析（缠论核心、、均线、macd、RSI技术指标、成交量、换手率变化）
-### 1. 趋势结构分析（缠论核心）
+### 1. 趋势结构分析（缠论核心包括：K线预处理、分型识别、中枢（Central Pivot）、三类买卖点）
 #### 1.1 预处理
 a. K线包含关系处理
 规则：按当前走势方向合并相邻包含关系的K线。
@@ -270,11 +268,14 @@ ZD（中枢低点）= 重叠区间最低价
 | RSI连续X日超买或者超卖（你要给出） | 多头建仓、持仓建议          | 空头建仓、持仓建议    |
 
 
-**最终策略参考**
+**假设现在已有50%仓位，最终策略，参考如下**
 - 趋势状态：`当前处于[上涨/下跌/震荡]笔，中枢区间[XX-XX]`
 - 关键位置：`支撑[XX-XX] | 阻力[XX-XX]`
 - 操作建议：`[多头/空头/观望]策略，建仓区间XX-XX，止损XX`
-- 2~5日预期：`看多或者看空概率（满足XX条件则反转），若是你的建议是看多还是看空`
+- X日预期：`看多或者看空概率（满足XX条件则反转），若是你,你会怎么操作，目标收益x%`
+- 1、若看多，请给出当前价格、目标价格、收益x%
+  2、若看震荡，请给出震荡区间，和操作方式，震荡幅度X%
+  3、若看空，请给出当前价格、目标价格、收益x%
 
 </分析结束>
 
@@ -305,6 +306,6 @@ if __name__ == "__main__":
     print("-----------561560---------------")
     r1test("561560")  # 直接调用同步函数
     print("---------588180-----------------")
-    #r1test("588180")
-    print("-----------159655----------")
+    r1test("588180")
+    #print("-----------159655----------")
     #r1test("159655")
