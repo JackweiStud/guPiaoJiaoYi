@@ -71,6 +71,7 @@ class DeepSeekAnalyzer:
             data_str = data_sample.to_markdown()
             data_summary = f"数据时间范围：{df['DateTime'].min()} 至 {df['DateTime'].max()}"
             #print("content" + f"{user_prompt}\n{data_summary}\n样本数据：\n{data_str}")
+            print("user_prompt:" + f"{user_prompt}\n")
 
             print("------------process_response 开始--------------------")
 
@@ -80,7 +81,8 @@ class DeepSeekAnalyzer:
                 json={
                     "messages": [
                         {"role": "system", "content": self.config.system_prompt},
-                        {"role": "user", "content": f"{user_prompt}\n{data_summary}\n样本数据：\n{data_str}"}
+                        #{"role": "user", "content": f"{user_prompt}\n{data_summary}\n样本数据：\n{data_str}"}
+                        {"role": "user", "content": f"{user_prompt}\n"}
                     ],
                     "model": self.config.model,
                     "max_tokens": self.config.max_tokens,
@@ -145,7 +147,7 @@ def r1test(code):
     # 1. 配置参数
     config = DeepSeekConfig(
         api_key="sk-muzyalwgqothjfvsdmzfdjsuiszgqvbgzsvijfteyoesaxdy",
-        system_prompt="你是一位专业的ETF市场分析师和交易员,言辞犀利，语言精简, 根据用户提供的行情数据给出核心分析和2~5天的建议,默认成功率大于66%"
+        system_prompt="你是一位严谨的ETF量化分析师和交易员,根据用户提供的行情数据给出核心分析和2~5天的建议,默认成功率大于66%，言辞犀利，语言精简"
     )
 
     # 2. 加载数据
@@ -161,6 +163,136 @@ def r1test(code):
     analyzer = DeepSeekAnalyzer(config)
 
     # 4. 执行分析
+
+    data_sample = df.tail(80)
+    data_str = data_sample.to_markdown()
+    data_summary = f"数据时间范围：{df['DateTime'].min()} 至 {df['DateTime'].max()}"
+
+    user_prompt = f"""
+    你是一位专业且严谨的金融量化分析师，需要基于提供的股票日线数据进行多维度技术分析(如缠论、均线、MACD、RSI、量价关系等)。请严格按照以下流程处理，最终输出指定格式结果：
+
+1、股票的已按照日线排序后的日线输入数据如下
+<输入数据>
+    某个股票的{data_summary}\n，最新80条样本数据
+    <stock_data>
+        {data_str}
+    </stock_data>
+
+   数据字段包括：
+    - 日期(DateTime)
+    - 开盘价(OpenValue)
+    - 收盘价(CloseValue)
+    - 最高价(HighValue)
+    - 最低价(LowValue)
+    - 成交量(Volume)
+    - 换手率(ChangeRate)
+</输入数据>
+
+2、请按以下步骤执行和分析：
+<分析步骤>
+    ### 1. 缠论分析预处理
+    在<分型验证>标签中执行：
+    a) 处理K线包含关系：
+    - 初始方向根据前两根实体K线阴阳判定
+    - 合并规则：
+    ```python
+    if 上涨处理: new_high = max(high1, high2), new_low = max(low1, low2)
+    if 下跌处理: new_high = min(high1, high2), new_low = min(low1, low2)
+    ```
+    - 保留跳空≥3%的原始K线
+
+    b) 分型验证：
+    - 顶分型：中间K线高点前后K线高点，且低点为三者最高
+    - 底分型：中间K线低点<前后K线低点，且高点为三者最低
+    - 过滤条件：分型间隔≥5根K线且波动≥1.5%
+
+    ### 2. 趋势结构判定
+    在<中枢计算>标签中：
+    a) 验证笔的有效性：
+    - 顶底间隔≥5根原始K线
+    - 价格波动幅度=(顶高-底低)/底低≥1.5%
+
+    b) 中枢构建：
+    - 取连续三笔的极值交集：
+    - 在<中枢计算>标签中记录：  
+        ```  
+        [重叠区间] = 连续三笔的最高低价交集  
+        ZG（中枢高点）= 重叠区间最高价
+        ZD（中枢低点）= 重叠区间最低价 
+        ``` 
+
+    c) 买卖点判决：
+    第一类	趋势末端背驰点	MACD面积/高度背离 或 量能萎缩30%
+    第二类	第一类后的次级别回抽	回调不破前低/反弹不破前高
+    第三类	中枢突破回踩确认	回踩幅度＜中枢高度的1/3
+    扩展情形	中枢延伸≥9段时	按扩展中枢重新计算ZG/ZD
+
+    ### 3. 技术指标计算
+    a) 均线系统：
+    - 计算5/8/16日EMA，标记金叉(5>8>16)或死叉(5<8<16)
+    - 计算20日平均Volume
+
+    b) MACD背驰验证：
+    - 对比相邻两段DIFF峰值和柱状面积
+
+    c) 动量指标：
+    - RSI超买(>70)/超卖(<30)持续时间
+    - 突破关键位时量能≥20日均量150%
+
+    ### 4. 市场情绪分析
+    - 量价比：上涨日/下跌日平均成交量比值
+    - 换手率：连续3日＞5%标记为异动
+    - 极端行情：单日涨跌幅＞7%且成交量创20日新高
+</分析步骤>
+
+
+3、请严格按照如下格式进行markdown输出
+<输出规范>
+在<分析报告>标签内按以下结构输出：
+
+<分析报告>
+    ##根据用户提供的X条数据分析，最新收盘时间XX，收盘价为：收盘价
+
+    ### 趋势结构
+    - 当前笔方向：[上涨/下跌]笔（持续X天）
+    - 中枢区间：ZG-X价格元 | ZD-X价格元
+    - 买卖点信号：当前的买卖类型（一/二/三） @对应触发价
+
+    ### 关键位置  
+    支撑位：`计算值X~X元`（基于中枢ZD±百分比）
+    阻力位：`计算值X~X元`（基于中枢ZG±百分比）
+
+    ### 操作建议
+    | 场景                | 多头策略                          | 空头策略                          |
+    |---------------------|-----------------------------------|-----------------------------------|
+    | 中枢上沿放量突破    | 突破价+X%追涨，止损中枢中轴       | 观望或反抽中枢上沿短空            |
+    | 中枢下沿缩量跌破    | 反弹至中枢下沿减仓                | 跌破价X%追空，止损前低           |
+    | RSI连续X日超买或者超卖 | 多头建仓、持仓建议          | 空头建仓、持仓建议    |
+
+
+    **持仓策略（目前50%仓位）**  
+    趋势状态：当前处于上涨笔，中枢区间，RSI、MACD
+    关键位置：支撑[] | 阻力[]
+    操作建议：XX策略，[]加仓，止损XX@X%(对应当前最新收盘价的百分比)
+    X日预期：看X概率X%（放量突破X确认），目标X（X%）
+    风控提示：XXX
+
+    ```
+
+    <特殊处理>
+    1. 中枢延伸≥9段时：
+    - 在<中枢扩展>标签中重新计算ZG/ZD
+    2. RSI连续超买：
+    - 在<量能验证>标签中检查20日均量
+    3. 数据缺失：
+    - 在<数据异常>标签中说明缺失日期及影响
+</分析报告>
+    请先执行所有计算验证，确认无误后在<分析报告>标签输出最终结果。所有中间验证过程请记录在对应子标签中。
+
+</输出规范>
+"""
+    
+    
     user_prompt1 = f"""
         一、将给你一段数据, 数据包括(DateTime,OpenValue,CloseValue,HighValue,LowValue,Volume,ChangeRate)
         二、可参考以下步骤分析：
@@ -169,7 +301,7 @@ def r1test(code):
             3. 给出具体建议 (明确买卖区间、阻力、支持位)]
             4. 结合你的实际策略，明确2~3天看多还是看空
         三、最终按照markDown格式输出, [注意：结论请用</分析结束>标记]"""
-    user_prompt = f"""
+    user_prompt2 = f"""
 ## 一、用户输入xxx股票的日线级别数据，格式如下：
 - **数据字段**：DateTime, OpenValue, CloseValue, HighValue, LowValue, Volume, ChangeRate
 - **数据已按时间升序排列
@@ -277,10 +409,7 @@ ZD（中枢低点）= 重叠区间最低价
   2、若看震荡，请给出震荡区间，和操作方式，震荡幅度X%
   3、若看空，请给出当前价格、目标价格、收益x%
 
-</分析结束>
-
-
-    """
+</分析结束> """
     result = analyzer.analyze_data(df, user_prompt)
 
     # 打印内容和推理内容
@@ -303,8 +432,8 @@ ZD（中枢低点）= 重叠区间最低价
 
 if __name__ == "__main__":
     
-    print("-----------561560---------------")
-    r1test("561560")  # 直接调用同步函数
+    #print("-----------561560---------------")
+    #r1test("561560")  # 直接调用同步函数
     print("---------588180-----------------")
     r1test("588180")
     #print("-----------159655----------")
