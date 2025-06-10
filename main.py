@@ -10,7 +10,7 @@ def ETFTest(code):
     print(f"----开始获取{symbol}_ETF分钟数据----------） ")
 
     # 初始化配置
-    config = ETFConfig(stock_code=f"{symbol}",periods=['60'])
+    config = ETFConfig(stock_code=f"{symbol}",periods=['120'])
     
     # 初始化组件
     fetcher = ETFFetcher(config)
@@ -44,7 +44,8 @@ if __name__ == "__main__":
     #case1 A股的电力ETF m'KeyboardInterrupt
     ETFTest("561560.SH")
     ETFTest("588180.SH")
-    ETFTest("159655.SH")
+    #ETFTest("159655.SH")
+    ETFTest("518880.SH") ##黄金
 
 
 

@@ -8,10 +8,10 @@ import os
 #数据存储目录（相对于项目根目录）
 BASE_DIR = Path(__file__).resolve().parent
 DATA_DIR = BASE_DIR / "stock_data"
-START_TIME = "2024-09-20 09:30:00"
+START_TIME = "2022-01-01 09:30:00"
 
 class ETFConfig:
-    DEFAULT_PERIODS = ['5', '15', '30', '60']
+    DEFAULT_PERIODS = ['5', '15', '30', '60', '120']
     dataPath = Path(DATA_DIR)
     startTime = START_TIME
     
