@@ -145,7 +145,7 @@ def notify_by_email(stock_code, signal_type, signal_text):
     image_paths = []
     # 无条件附上图片
     image_folder = os.path.join(project_root, 'pic')
-    required_images = ['expectSignal.png', 'RealSignal.png', 'RealTimeReturn.png', 'temp_strategy.csv', 'BuyAndSell.csv']
+    required_images = ['expectSignal.png', 'Strategy_Performance_Dashboard.png', 'temp_strategy.csv', 'divergence_ratio.csv', 'BuyAndSell.csv']
     
     for img_name in required_images:
         path = os.path.join(image_folder, img_name)

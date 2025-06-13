@@ -468,153 +468,227 @@ def calculate_performance(portfolio_df, initial_capital, verbose=True):
         "portfolio_df": portfolio_df # 返回带有计算列的DataFrame
     }
 
+def add_crosshair_cursor(fig, ax0, ax3, plot_data):
+    """
+    为K线图和成交量图添加交互式十字光标和信息显示。
+
+    :param fig: Figure对象
+    :param ax0: K线图的Axes对象
+    :param ax3: 成交量图的Axes对象
+    :param plot_data: 包含绘图数据的DataFrame
+    """
+    # 创建十字光标的线条，初始时不可见
+    cursor_v_ax0 = ax0.axvline(x=-1, color='k', linestyle='--', linewidth=0.8, visible=False)
+    cursor_v_ax3 = ax3.axvline(x=-1, color='k', linestyle='--', linewidth=0.8, visible=False)
+    cursor_h_ax3 = ax3.axhline(y=-1, color='k', linestyle='--', linewidth=0.8, visible=False)
+
+    # 创建信息注释框，初始时不可见
+    annot_text = ax3.text(0, 0, '', visible=False,
+                          bbox=dict(boxstyle='round,pad=0.5', fc='yellow', alpha=0.8),
+                          fontdict={'size': 10})
+
+    def on_mouse_move(event):
+        # 检查鼠标是否在ax0或ax3坐标轴内
+        if event.inaxes not in [ax0, ax3]:
+            # 如果鼠标移出，则隐藏所有指示元素
+            if cursor_v_ax0.get_visible():
+                cursor_v_ax0.set_visible(False)
+                cursor_v_ax3.set_visible(False)
+                cursor_h_ax3.set_visible(False)
+                annot_text.set_visible(False)
+                fig.canvas.draw_idle()
+            return
+
+        # 获取鼠标位置对应的x轴索引
+        x_idx = int(round(event.xdata))
+
+        # 确保索引在有效范围内
+        if 0 <= x_idx < len(plot_data):
+            # 获取对应数据点的信息
+            data_point = plot_data.iloc[x_idx]
+            close_price = data_point['CloseValue']
+            volume = data_point['Volume']
+            date_str = data_point['DateTime'].strftime('%Y-%m-%d')
+            rsi_value = data_point.get('rsi', float('nan'))
+            
+            # 更新垂直线的位置
+            cursor_v_ax0.set_xdata([x_idx, x_idx])
+            cursor_v_ax3.set_xdata([x_idx, x_idx])
+
+            # 只在鼠标悬停于ax3上时显示水平线
+            if event.inaxes == ax3:
+                cursor_h_ax3.set_ydata([event.ydata, event.ydata])
+                cursor_h_ax3.set_visible(True)
+            else:
+                cursor_h_ax3.set_visible(False)
+
+            # 准备要显示的文本
+            text_to_display = f"日期: {date_str}\n收盘价: {close_price:.2f}\n成交量: {volume/10000:.2f}万手\nRSI: {rsi_value:.2f}"
+            annot_text.set_text(text_to_display)
+
+            # 根据鼠标位置决定文本框显示在左侧还是右侧，避免遮挡
+            xlim = ax3.get_xlim()
+            if event.xdata > (xlim[0] + xlim[1]) / 2:
+                annot_text.set_position((event.xdata - (xlim[1]-xlim[0])*0.02, event.ydata))
+                annot_text.set_ha('right') # 水平对齐：右
+            else:
+                annot_text.set_position((event.xdata + (xlim[1]-xlim[0])*0.02, event.ydata))
+                annot_text.set_ha('left') # 水平对齐：左
+
+            annot_text.set_va('center') # 垂直居中对齐
+            
+            # 设置所有指示元素为可见
+            cursor_v_ax0.set_visible(True)
+            cursor_v_ax3.set_visible(True)
+            annot_text.set_visible(True)
+            
+            # 重绘画布以显示更新
+            fig.canvas.draw_idle()
+
+    # 将事件处理函数连接到图
+    fig.canvas.mpl_connect('motion_notify_event', on_mouse_move)
+
+def _plot_candlestick(ax, plot_data, title="K线图及交易信号"):
+    """辅助函数：在给定的Axes上绘制K线图"""
+    up = plot_data[plot_data['CloseValue'] >= plot_data['OpenValue']]
+    down = plot_data[plot_data['CloseValue'] < plot_data['OpenValue']]
+    
+    # 绘制影线 (红涨绿跌)
+    ax.vlines(up.index, up['LowValue'], up['HighValue'], color='red', linewidth=1, alpha=0.8)
+    ax.vlines(down.index, down['LowValue'], down['HighValue'], color='green', linewidth=1, alpha=0.8)
+    # 绘制实体
+    ax.vlines(up.index, up['OpenValue'], up['CloseValue'], color='red', linewidth=5)
+    ax.vlines(down.index, down['OpenValue'], down['CloseValue'], color='green', linewidth=5)
+    
+    ax.set_title(title)
+    ax.set_ylabel('价格')
+    ax.grid(True)
+
+
 def plot_performance(portfolio_df, benchmark_data=None, 
                      short_window=5, long_window=21, # 均线值
-                     volume_mavg_Value=10): #成交量x日均值
+                     volume_mavg_Value=10, #成交量x日均值
+                     rsi_period=13): # RSI周期
     """
-    绘制绩效图表
-    :param portfolio_df: DataFrame, 包含 'total', 'drawdown', 'OpenValue', 'HighValue', 'LowValue', 'CloseValue', 'signal' 列
-    :param benchmark_data: Series, 基准收益率 (例如沪深300指数的日收益率)
+    绘制集成化的绩效分析仪表盘
+    :param portfolio_df: DataFrame, 包含 'total', 'drawdown', 'OpenValue', ... 'signal' 列
+    :param benchmark_data: Series, 基准收益率
     :param short_window: 短期均线窗口
     :param long_window: 长期均线窗口
     :param volume_mavg_Value: 成交量均线窗口
+    :param rsi_period: RSI 计算周期
     """
-    # 检查绘图所需列是否存在
-    required_cols = ['OpenValue', 'HighValue', 'LowValue', 'CloseValue', 'signal', 'total', 'drawdown']
+    required_cols = ['OpenValue', 'HighValue', 'LowValue', 'CloseValue', 'Volume', 'signal', 'total', 'drawdown']
     if not all(col in portfolio_df.columns for col in required_cols):
-        print("绘图失败：DataFrame缺少必要的列 (OHLC, signal, total, drawdown).")
-        # 尝试只绘制可用部分
+        print("绘图失败：DataFrame缺少必要的列。")
         if 'total' in portfolio_df.columns:
-            portfolio_df['total'].plot(title='投资组合价值')
+            portfolio_df['total'].plot(title='投资组合价值').grid(True)
             plt.show()
         return
 
     plot_data = portfolio_df.reset_index()
     
-    # 计算均线
+    # --- 1. 数据计算 ---
     ma_short_col = f'ma{short_window}'
     ma_long_col = f'ma{long_window}'
-    plot_data[ma_short_col] = plot_data['CloseValue'].rolling(window=short_window, min_periods=1).mean()
-    plot_data[ma_long_col] = plot_data['CloseValue'].rolling(window=long_window, min_periods=1).mean()
-    #plot_data['ma32'] = plot_data['CloseValue'].rolling(window=32, min_periods=1).mean()
-    # 计算均量线
-    plot_data['volume_ma'] = plot_data['Volume'].rolling(window=volume_mavg_Value, min_periods=1).mean()
-
-    # === 窗口A: K线图和成交量 ===
-    fig1, (ax0, ax3) = plt.subplots(2, 1, figsize=(18, 12), 
-                                     sharex=True,
-                                     gridspec_kw={'height_ratios': [3, 1]})
-    fig1.suptitle('实际交易信号', fontsize=18)
-    fig1.subplots_adjust(hspace=0.1)  # 调整子图间距
-
-    # --- K线图 & 买卖点 & 均线 ---
-    up = plot_data[plot_data['CloseValue'] >= plot_data['OpenValue']]
-    down = plot_data[plot_data['CloseValue'] < plot_data['OpenValue']]
+    plot_data[ma_short_col] = plot_data['CloseValue'].rolling(window=short_window).mean()
+    plot_data[ma_long_col] = plot_data['CloseValue'].rolling(window=long_window).mean()
+    plot_data['volume_ma'] = plot_data['Volume'].rolling(window=volume_mavg_Value).mean()
     
-    # 绘制影线 (红涨绿跌)
-    ax0.vlines(up.index, up['LowValue'], up['HighValue'], color='red', linewidth=1, alpha=0.8)
-    ax0.vlines(down.index, down['LowValue'], down['HighValue'], color='green', linewidth=1, alpha=0.8)
-    # 绘制实体
-    ax0.vlines(up.index, up['OpenValue'], up['CloseValue'], color='red', linewidth=5)
-    ax0.vlines(down.index, down['OpenValue'], down['CloseValue'], color='green', linewidth=5)
+    # 计算RSI
+    delta = plot_data['CloseValue'].diff()
+    gain = delta.clip(lower=0)
+    loss = -delta.clip(upper=0)
+    avg_gain = gain.ewm(com=rsi_period - 1, min_periods=rsi_period).mean()
+    avg_loss = loss.ewm(com=rsi_period - 1, min_periods=rsi_period).mean()
+    plot_data['rsi'] = 100 - (100 / (1 + (avg_gain / avg_loss)))
+
+    # --- 2. 图表布局 (新顺序) ---
+    fig = plt.figure(figsize=(20, 18))
+    fig.suptitle('策略绩效分析仪表盘', fontsize=20)
+    # K线(6), 成交量(1.5), RSI(1), 净值(2), 回撤(1)
+    gs = fig.add_gridspec(5, 1, height_ratios=[6, 1.5, 1, 2, 1], hspace=0.3)
     
-    # 绘制均线
-    ax0.plot(plot_data.index, plot_data[ma_short_col], color='blue', linestyle='-', linewidth=1.5, label=f'{short_window}日均线')
-    ax0.plot(plot_data.index, plot_data[ma_long_col], color='purple', linestyle='-', linewidth=1.5, label=f'{long_window}日均线')
-    #ax0.plot(plot_data.index, plot_data['ma32'], color='black', linestyle='-', linewidth=1.5, label='32日均线')
-    # 标记买卖点
+    ax_kline = fig.add_subplot(gs[0])
+    ax_volume = fig.add_subplot(gs[1], sharex=ax_kline)
+    ax_rsi = fig.add_subplot(gs[2], sharex=ax_kline)
+    ax_equity = fig.add_subplot(gs[3], sharex=ax_kline)
+    ax_drawdown = fig.add_subplot(gs[4], sharex=ax_kline)
+
+    # 隐藏非底部图表的X轴标签
+    plt.setp(ax_kline.get_xticklabels(), visible=False)
+    plt.setp(ax_volume.get_xticklabels(), visible=False)
+    plt.setp(ax_rsi.get_xticklabels(), visible=False)
+    plt.setp(ax_equity.get_xticklabels(), visible=False)
+
+    # --- 3. 绘制各个子图 (新顺序) ---
+    # K线图, 均线, 交易信号
+    _plot_candlestick(ax_kline, plot_data)
+    ax_kline.plot(plot_data.index, plot_data[ma_short_col], color='blue', lw=1.5, label=f'{short_window}日均线')
+    ax_kline.plot(plot_data.index, plot_data[ma_long_col], color='purple', lw=1.5, label=f'{long_window}日均线')
+
     buy_signals = plot_data[plot_data['signal'] == 1]
     sell_signals = plot_data[plot_data['signal'] == -1]
-    
     if not buy_signals.empty:
-        ax0.plot(buy_signals.index, buy_signals['LowValue'] * 0.99, '^', color='red', markersize=12, label='买入信号', markeredgecolor='black')
-    
+        ax_kline.plot(buy_signals.index, buy_signals['LowValue'] * 0.99, '^', c='red', ms=12, label='买入信号', mec='black')
     if not sell_signals.empty:
-        ax0.plot(sell_signals.index, sell_signals['HighValue'] * 1.01, 'v', color='green', markersize=12, label='卖出信号', markeredgecolor='black')
-
-    ax0.set_title('K线图及交易信号')
-    ax0.set_ylabel('价格')
-    ax0.legend()
-    ax0.grid(True)
-
-    # --- 成交量图 ---
-    # 上涨日成交量（红色）
-    ax3.bar(up.index, up['Volume'] / 10000, color='red', alpha=0.7)
-    # 下跌日成交量（绿色）
-    ax3.bar(down.index, down['Volume'] / 10000, color='green', alpha=0.7)
-    # 绘制均量线
-    ax3.plot(plot_data.index, plot_data['volume_ma'] / 10000, color='blue', linestyle='--', linewidth=1, label=f'{volume_mavg_Value}日均量')
+        ax_kline.plot(sell_signals.index, sell_signals['HighValue'] * 1.01, 'v', c='green', ms=12, label='卖出信号', mec='black')
+    ax_kline.legend(loc='upper left')
     
-    ax3.set_title('成交量(万手)')
-    ax3.set_ylabel('成交量(万手)')
-    ax3.legend()
-    ax3.grid(True)
+    # 成交量图
+    up = plot_data[plot_data['CloseValue'] >= plot_data['OpenValue']]
+    down = plot_data[plot_data['CloseValue'] < plot_data['OpenValue']]
+    ax_volume.bar(up.index, up['Volume'] / 10000, color='red', alpha=0.7)
+    ax_volume.bar(down.index, down['Volume'] / 10000, color='green', alpha=0.7)
+    ax_volume.plot(plot_data.index, plot_data['volume_ma'] / 10000, color='blue', lw=1, label=f'{volume_mavg_Value}日均量')
+    ax_volume.set_title('成交量(万手)')
+    ax_volume.set_ylabel('成交量(万手)')
+    ax_volume.legend(loc='upper left')
+    ax_volume.grid(True)
     
-    # === 窗口B: 资产净值和回撤 ===
-    fig2, (ax1, ax2) = plt.subplots(2, 1, figsize=(18, 12), 
-                                     sharex=True,
-                                     gridspec_kw={'height_ratios': [1, 1]})
-    fig2.suptitle('资产净值与回撤', fontsize=18)
-    fig2.subplots_adjust(hspace=0.1)  # 调整子图间距
+    # RSI 指标图
+    ax_rsi.set_title('RSI 指标')
+    ax_rsi.plot(plot_data.index, plot_data['rsi'], color='orange', lw=1.5, label=f'RSI({rsi_period})')
+    ax_rsi.axhline(70, color='red', linestyle='--', lw=1, alpha=0.8)
+    ax_rsi.axhline(30, color='green', linestyle='--', lw=1, alpha=0.8)
+    ax_rsi.fill_between(plot_data.index, 70, 100, color='red', alpha=0.1)
+    ax_rsi.fill_between(plot_data.index, 0, 30, color='green', alpha=0.1)
+    ax_rsi.set_ylim(0, 100)
+    ax_rsi.legend(loc='upper left')
+    ax_rsi.grid(True)
 
-    # --- 资产净值曲线 ---
-    ax1.plot(plot_data.index, plot_data['total'], label='策略')
+    # 资产净值曲线 vs. 基准
+    ax_equity.set_title('投资组合价值')
+    ax_equity.plot(plot_data.index, plot_data['total'], label='策略净值', color='dodgerblue')
     if benchmark_data is not None:
-        initial_capital = portfolio_df['total'].iloc[0]
+        initial_capital = plot_data['total'].iloc[0]
         benchmark_normalized = (1 + benchmark_data['returns']).cumprod() * initial_capital
-        benchmark_normalized = benchmark_normalized.reindex(portfolio_df.index, method='pad')
-        ax1.plot(plot_data.index, benchmark_normalized.values, label='基准', linestyle='--')
+        benchmark_normalized = benchmark_normalized.reindex(plot_data['DateTime'], method='pad').values
+        ax_equity.plot(plot_data.index, benchmark_normalized, label='基准', color='darkgrey', linestyle='--')
+    ax_equity.legend(loc='upper left')
+    ax_equity.grid(True)
+    
+    # 回撤曲线
+    ax_drawdown.set_title('回撤')
+    ax_drawdown.plot(plot_data.index, plot_data['drawdown'], color='#F4A460')
+    ax_drawdown.fill_between(plot_data.index, plot_data['drawdown'], 0, color='#FF7F7F', alpha=0.5)
+    ax_drawdown.grid(True)
 
-    ax1.set_title('投资组合价值')
-    ax1.set_ylabel('价值')
-    ax1.legend()
-    ax1.grid(True)
-
-    # --- 回撤曲线 ---
-    # 绘制回撤曲线
-    ax2.plot(plot_data.index, plot_data['drawdown'], color='#F4A460')
-    
-    # 填充回撤区域
-    ax2.fill_between(plot_data.index, plot_data['drawdown'], 0,
-                     where=(plot_data['drawdown'] < 0),
-                     color='#FF7F7F', alpha=0.5)
-    
-    ax2.set_title('回撤')
-    ax2.set_ylabel('回撤')
-    ax2.grid(True)
-    
-    # --- 格式化 X 轴 ---
-    num_ticks = min(30, len(plot_data))
+    # --- 4. 格式化和显示 ---
+    num_ticks = min(20, len(plot_data))
     if num_ticks > 0:
         tick_indices = np.linspace(0, len(plot_data) - 1, num_ticks, dtype=int)
         tick_labels = plot_data['DateTime'].iloc[tick_indices].dt.strftime('%Y-%m-%d')
-        # 为所有子图设置相同的X轴刻度
-        # 由于共享了X轴, 只需要对每个figure的底部subplot设置即可
-        for ax in [ax3, ax2]:
-            ax.set_xticks(tick_indices)
-            ax.set_xticklabels(tick_labels, rotation=30, ha='right')
+        ax_drawdown.set_xticks(tick_indices)
+        ax_drawdown.set_xticklabels(tick_labels, rotation=30, ha='right')
 
-    # 添加日期格式化函数
-    def format_coord(x, y):
-        """自定义坐标显示格式，显示日期和值"""
-        if 0 <= x < len(plot_data):
-            date_str = plot_data.loc[int(x), 'DateTime'].strftime('%Y-%m-%d')
-            return f'日期: {date_str}, 值: {y:.2f}'
-        return f'X: {x:.2f}, Y: {y:.2f}'
+    # 为所有子图添加十字光标功能
+    add_crosshair_cursor(fig, ax_kline, ax_volume, plot_data)
     
-    # 为K线图和成交量图设置自定义坐标格式化器
-    ax0.format_coord = format_coord
-    ax3.format_coord = format_coord
-    ax1.format_coord = format_coord
-    ax2.format_coord = format_coord
-
-    # 分别显示两个窗口
-    fig1.tight_layout(rect=[0, 0, 1, 0.96])
-    fig2.tight_layout(rect=[0, 0, 1, 0.96])
-
-    fig2.savefig('pic/RealTimeReturn.png')
-    fig1.savefig('pic/RealSignal.png')
+    fig.tight_layout(rect=[0, 0.03, 1, 0.98]) # 调整布局以适应主标题
+    fig.savefig('pic/Strategy_Performance_Dashboard.png')
     plt.show()
+
 
 
 '''
@@ -712,7 +786,8 @@ def strategyFunc(filepath,
             plot_performance(plot_df, benchmark_df_for_plot, 
                              short_window, 
                              long_window, 
-                             volume_mavg_Value)
+                             volume_mavg_Value,
+                             rsi_period)
         
         if verbose:
             print("\n回测完成。")
@@ -762,7 +837,7 @@ def testOnlyOk(symbol):
             rsiRateUp=rsiRateUp,
             divergence_threshold=divergence_threshold,
             VolumeSellRate=VolumeSellRate,
-            statTime='2021-1-01',
+            statTime='2023-1-01',
             endTime='2025-9-20',
             plot_results=True,
             verbose=True)
@@ -1022,9 +1097,9 @@ def testOnlyNew(symbol):
 
 
 if __name__ == "__main__":
-   #testOnlyOk(symbol = "588180") #固定参数测试
+   testOnlyOk(symbol = "588180") #固定参数测试
    #findGoodParam()#动态寻优测试
    #testOnly1(symbol = "588180")
 
 
-   testOnlyNew("588180")
+   #testOnlyNew("588180")
