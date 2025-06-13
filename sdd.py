@@ -7,6 +7,11 @@ import sys
 from datetime import datetime
 import platform
 import matplotlib.font_manager as fm
+import os
+project_root = os.path.dirname((os.path.abspath(__file__)))
+sys.path.append(project_root)
+print(project_root)
+
 
 # 动态设置matplotlib中文字体，以适应不同操作系统
 def set_chinese_font():
@@ -23,12 +28,7 @@ def set_chinese_font():
         # Linux系统: 尝试使用常见的开源中文字体
         # 用户可能需要预先安装这些字体, e.g., on Debian/Ubuntu:
         # sudo apt-get update && sudo apt-get install -y fonts-wqy-zenhei
-        #plt.rcParams['font.sans-serif'] = ['Liberation Sans', 'WenQuanYi Zen Hei', 'WenQuanYi Micro Hei', 'Noto Sans CJK SC']
-
-        # Linux系统: 尝试使用常见的开源中文字体
-        # 用户可能需要预先安装这些字体, e.g., on Debian/Ubuntu:
-        # sudo apt-get update && sudo apt-get install -y fonts-wqy-zenhei
-        plt.rcParams['font.sans-serif'] = ['WenQuanYi Zen Hei', 'WenQuanYi Micro Hei', 'Noto Sans CJK SC']
+        plt.rcParams['font.sans-serif'] = ['Liberation Sans', 'WenQuanYi Zen Hei', 'WenQuanYi Micro Hei', 'Noto Sans CJK SC']
     elif os_name == 'Darwin':
         # macOS系统: 优先使用苹方，备选黑体-简
         plt.rcParams['font.sans-serif'] = ['PingFang SC', 'Heiti SC', 'STHeiti']
@@ -40,7 +40,7 @@ def set_chinese_font():
 
     # 检查字体是否可用
     available_fonts = [f.name for f in fm.fontManager.ttflist]
-    print("可用的字体:", available_fonts)
+    #print("可用的字体:", available_fonts)
 
 # 在脚本开始时调用函数进行设置
 set_chinese_font()
@@ -119,9 +119,9 @@ def simple_ma_strategy(data, short_window, long_window,
     # 新增：下跌趋势中乖离率过大，也出现买入信号 科创  etf 7.5%  买入，卖出约 -15%
     divergence_ratio = (signals['long_mavg'] - signals['short_mavg']) / signals['long_mavg']
     divergence_buy_condition = (ma_state == 0) & (divergence_ratio > divergence_threshold)  
-   
-
+    #最终的卖出信号
     buy_condition = ma_buy_condition | rsi_buy_condition | divergence_buy_condition
+
     # 将divergence_ratio转换为百分比并保存到CSV文件
     divergence_df = pd.DataFrame({
         'DateTime': data.index,
@@ -143,7 +143,7 @@ def simple_ma_strategy(data, short_window, long_window,
     #sell_condition = (ma_state_diff == -1) | (data['CloseValue'] < signals['long_mavg'])
     #sell_condition = sell_condition & (data['CloseValue'] < signals['short_mavg'])
     
-    # 4. 生成卖出信号: 死叉发生, 或收盘价低于长均线, 或上升趋势中放出天量
+    # 生成卖出信号: 死叉发生, 或收盘价低于长均线, 或上升趋势中放出天量
     sell_condition = (ma_state_diff == -1) | (data['CloseValue'] < signals['long_mavg']) 
     sell_condition = sell_condition & (data['CloseValue'] < signals['short_mavg'])
     uptrend_volume_sell = (ma_state == 1) & (data['Volume'] > (volume_mavg * VolumeSellRate))
@@ -300,10 +300,18 @@ def run_backtest(data,
                  buy_increment_pct_of_initial_capital=0.2, # 每次买入动用初始总资金的20%
                  sell_decrement_pct_of_current_shares=0.5, # 每次卖出当前持仓的50%
                  min_shares_per_trade=100, # 最小交易股数 (ETF通常100份)
-                 verbose=True
+                 verbose=True,
+                 statTime=None, 
+                 endTime=None
                 ):
     
-    portfolio = pd.DataFrame(index=data.index)
+    # 根据回测时间范围筛选数据
+    if statTime or endTime:
+        backtest_data = data.loc[statTime:endTime]
+    else:
+        backtest_data = data
+
+    portfolio = pd.DataFrame(index=backtest_data.index)
     portfolio['holdings_value'] = 0.0  # 持有ETF的市值
     portfolio['cash'] = initial_capital
     portfolio['total_value'] = initial_capital
@@ -319,14 +327,14 @@ def run_backtest(data,
               f"  每次卖出当前持有份额的百分比: {sell_decrement_pct_of_current_shares*100}%\n"
               f"  最小交易单位--100份: {min_shares_per_trade}")
 
-    for i in range(len(data)):
-        current_date = data.index[i]
+    for i in range(len(backtest_data)):
+        current_date = backtest_data.index[i]
         current_signal = signals.loc[current_date]
-        trade_price = data['CloseValue'].loc[current_date] # 假设以当日收盘价交易
+        trade_price = backtest_data['CloseValue'].loc[current_date] # 假设以当日收盘价交易
 
         # 继承前一天的状态
         if i > 0:
-            prev_date = data.index[i-1]
+            prev_date = backtest_data.index[i-1]
             portfolio.loc[current_date, 'cash'] = portfolio.loc[prev_date, 'cash']
             portfolio.loc[current_date, 'shares'] = portfolio.loc[prev_date, 'shares']
             portfolio.loc[current_date, 'commission_paid'] = 0 # 当日手续费重置
@@ -657,9 +665,6 @@ def strategyFunc(filepath,
 
         # 1. 加载数据
         etf_data = load_etf_data(filepath)
-        # 根据时间筛选数据
-        if statTime or endTime:
-            etf_data = etf_data.loc[statTime:endTime]
         
         if verbose:
             print("数据加载成功:")
@@ -686,7 +691,9 @@ def strategyFunc(filepath,
             buy_increment_pct_of_initial_capital=buy_increment_pct_of_initial_capital,
             sell_decrement_pct_of_current_shares=sell_decrement_pct_of_current_shares,
             min_shares_per_trade=min_shares_per_trade,
-            verbose=verbose
+            verbose=verbose,
+            statTime=statTime,
+            endTime=endTime
         )
 
         # 4. 计算并展示绩效
@@ -712,13 +719,14 @@ def strategyFunc(filepath,
         return performance_stats
 
 
-def testOnlyOk():
+def testOnlyOk(symbol):
     #filepath="D:\\Code\\Ai\\jinrongTest\\github\\stock_data\\561560_Day.csv"
    #filepath="D:\\Code\\Ai\\jinrongTest\\github\\stock_data\\518880_Day.csv"
-   filepath="D:\\Code\\Ai\\jinrongTest\\github\\stock_data\\588180_Day.csv" # 科创50
+   #filepath="D:\\Code\\Ai\\jinrongTest\\github\\stock_data\\588180_Day.csv" # 科创50
    #filepath="D:\\Code\\Ai\\jinrongTest\\github\\stock_data\\159915_Day.csv" #创业板
    #filepath="D:\\Code\\Ai\\jinrongTest\\github\\stock_data\\513160_Day.csv" #港股科技
-
+   filepath = os.path.join(project_root, 'stock_data', f'{symbol}', f'{symbol}_Day.csv')
+   print(filepath) 
    # --- 策略参数 ---
    short_window = 5
    long_window = 21
@@ -754,7 +762,7 @@ def testOnlyOk():
             rsiRateUp=rsiRateUp,
             divergence_threshold=divergence_threshold,
             VolumeSellRate=VolumeSellRate,
-            statTime='2023-1-01',
+            statTime='2021-1-01',
             endTime='2025-9-20',
             plot_results=True,
             verbose=True)
@@ -860,13 +868,15 @@ def findGoodParam():
     else:
         print("没有找到有效的参数组合。")
 
-
-def testOnly1():
+def testOnly1(symbol = "588180"):
     #filepath="D:\\Code\\Ai\\jinrongTest\\github\\stock_data\\561560_Day.csv"
    #filepath="D:\\Code\\Ai\\jinrongTest\\github\\stock_data\\518880_Day.csv"
    filepath="D:\\Code\\Ai\\jinrongTest\\github\\stock_data\\588180_Day.csv" # 科创50
    #filepath="D:\\Code\\Ai\\jinrongTest\\github\\stock_data\\159915_Day.csv" #创业板
    #filepath="D:\\Code\\Ai\\jinrongTest\\github\\stock_data\\513160_Day.csv" #港股科技
+   
+   filepath = os.path.join(project_root, 'stock_data', f'{symbol}', f'{symbol}_Day.csv')
+   print(filepath)
 
    # --- 策略参数 ---
    Parameters1 = {'short_window': np.int64(3), 
@@ -917,18 +927,19 @@ def testOnly1():
             rsiRateUp=rsiRateUp,
             divergence_threshold=divergence_threshold,
             VolumeSellRate=VolumeSellRate,
-            statTime='2023-1-01',
-            endTime='2025-9-20',
+            statTime='2022-1-01',
+            endTime='2024-9-20',
             plot_results=True,
             verbose=True)
 
-def testOnlyNew():
+def testOnlyNew(symbol):
     #filepath="D:\\Code\\Ai\\jinrongTest\\github\\stock_data\\561560_Day.csv"
    #filepath="D:\\Code\\Ai\\jinrongTest\\github\\stock_data\\518880_Day.csv"
    filepath="D:\\Code\\Ai\\jinrongTest\\github\\stock_data\\588180_Day.csv" # 科创50
    #filepath="D:\\Code\\Ai\\jinrongTest\\github\\stock_data\\159915_Day.csv" #创业板
    #filepath="D:\\Code\\Ai\\jinrongTest\\github\\stock_data\\513160_Day.csv" #港股科技
-
+   filepath = os.path.join(project_root, 'stock_data', f'{symbol}', f'{symbol}_Day.csv')
+   print(filepath) 
    # --- 策略参数 ---
    Parameters = {'short_window': np.int64(3), 
                 'long_window': np.int64(12), 
@@ -1011,12 +1022,9 @@ def testOnlyNew():
 
 
 if __name__ == "__main__":
-   #testOnlyOk() #固定参数测试
+   #testOnlyOk(symbol = "588180") #固定参数测试
    #findGoodParam()#动态寻优测试
-   #testOnly1()
+   #testOnly1(symbol = "588180")
 
 
-   testOnlyNew()
-   
-
-   # todo 每只股票需要寻优单独的策略因子
+   testOnlyNew("588180")

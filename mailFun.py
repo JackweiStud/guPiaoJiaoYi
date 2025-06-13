@@ -16,6 +16,8 @@ import os
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from email.mime.image import MIMEImage
+from email.mime.base import MIMEBase
+from email import encoders
 from typing import List, Optional
 
 # 从配置文件中导入配置信息
@@ -78,17 +80,27 @@ class EmailSender:
         if image_paths:
             for image_path in image_paths:
                 if not os.path.exists(image_path):
-                    print(f"警告：图片文件路径不存在 -> {image_path}")
+                    print(f"警告：附件文件路径不存在 -> {image_path}")
                     continue
                 
                 try:
-                    with open(image_path, 'rb') as image_file:
-                        image_name = os.path.basename(image_path)
-                        mime_image = MIMEImage(image_file.read(), name=image_name)
-                        mime_image.add_header('Content-Disposition', f'attachment; filename="{image_name}"')
-                        message.attach(mime_image)
+                    with open(image_path, 'rb') as f:
+                        file_name = os.path.basename(image_path)
+                        
+                        # 根据文件扩展名选择合适的MIME类型
+                        if file_name.lower().endswith(('.png', '.jpg', '.jpeg', '.gif')):
+                            part = MIMEImage(f.read(), name=file_name)
+                            part.add_header('Content-Disposition', f'attachment; filename="{file_name}"')
+                        else:
+                            # 对于非图片文件（如CSV），使用通用的 application/octet-stream
+                            part = MIMEBase('application', 'octet-stream')
+                            part.set_payload(f.read())
+                            encoders.encode_base64(part)
+                            part.add_header('Content-Disposition', f'attachment; filename="{file_name}"')
+                        
+                        message.attach(part)
                 except Exception as e:
-                    print(f"错误：附加图片 {image_path} 时发生错误 -> {e}")
+                    print(f"错误：附加文件 {image_path} 时发生错误 -> {e}")
 
         server = None
         try:

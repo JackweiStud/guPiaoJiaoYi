@@ -1,26 +1,23 @@
 import sys
 import os
-from datetime import datetime
+from datetime import datetime, timezone, timedelta
 import pandas as pd
 import numpy as np
 
-# 将项目根目录添加到 sys.path
-# 这对于直接运行此脚本时，能够正确导入项目中的其他模块至关重要。
-# os.path.abspath(__file__) 获取当前脚本的绝对路径
-# os.path.dirname() 获取路径中的目录部分
-# 我们需要获取到项目的根目录，即'github'这一层
 # 将项目根目录添加到 Python 模块搜索路径中
 # 这使得脚本可以找到 emailFile 等兄弟模块
 project_root = os.path.dirname((os.path.abspath(__file__)))
 sys.path.append(project_root)
-print(project_root)
+print('code path is ',project_root)
 
 from main import ETFTest
 from sdd import strategyFunc
 from mailFun import EmailSender
 from mailFun import config as email_config
 
-
+def get_beijing_time():
+    """返回当前的北京时间 (UTC+8)"""
+    return datetime.now(timezone(timedelta(hours=8)))
 
 def run_trading_strategy(stock_code="588180.SH"):
     """
@@ -28,7 +25,7 @@ def run_trading_strategy(stock_code="588180.SH"):
     """
     print("="*50)
     print(f"开始执行 {stock_code} 交易策略自动化流程...")
-    print(f"执行时间: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+    print(f"执行时间: {get_beijing_time().strftime('%Y-%m-%d %H:%M:%S')}")
     print("="*50)
 
     # 1. 获取最新的ETF数据，增加鲁棒性
@@ -61,8 +58,8 @@ def get_trading_signal(stock_code):
     返回信号类型和信号文本。
     """
     symbol = stock_code.split('.')[0]
-    filepath = os.path.join(project_root, 'stock_data', f'{symbol}', f'{symbol}_Day.csv')
-    print(filepath)
+    filepath = os.path.join(project_root, 'stock_data',  f'{symbol}', f'{symbol}_Day.csv')
+
     if not os.path.exists(filepath):
         print(f"错误：数据文件不存在 -> {filepath}")
         return "error", "数据文件丢失"
@@ -89,7 +86,7 @@ def get_trading_signal(stock_code):
             buy_increment_pct_of_initial_capital=1, sell_decrement_pct_of_current_shares=1,
             min_shares_per_trade=100,
             # 设置时间范围，确保包含今天
-            statTime='2023-01-01', endTime=datetime.now().strftime('%Y-%m-%d'),
+            statTime='2025-01-01', endTime=get_beijing_time().strftime('%Y-%m-%d'),
             plot_results=True,  # 需要设置为True以生成图片
             verbose=False
         )
@@ -97,7 +94,7 @@ def get_trading_signal(stock_code):
         portfolio_df = performance_stats.get('portfolio_df')
 
         if portfolio_df is not None and not portfolio_df.empty:
-            today = pd.to_datetime(datetime.now().date())
+            today = pd.to_datetime(get_beijing_time().date())
             # 检查回测结果中是否有今天的信号
             if today in portfolio_df.index:
                 todays_signal_val = portfolio_df.loc[today]['signal']
@@ -136,8 +133,8 @@ def notify_by_email(stock_code, signal_type, signal_text):
 这是来自您的自动化交易策略机器人的通知。
 
 标的: {stock_code}
-时间: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
-信号: 今天的交易信号---{signal_text}
+时间: {get_beijing_time().strftime('%Y-%m-%d %H:%M:%S')}
+信号: {signal_text}
 
 请查看附件图片获取详细图表。
 
@@ -148,7 +145,7 @@ def notify_by_email(stock_code, signal_type, signal_text):
     image_paths = []
     # 无条件附上图片
     image_folder = os.path.join(project_root, 'pic')
-    required_images = ['expectSignal.png', 'RealSignal.png', 'RealTimeReturn.png']
+    required_images = ['expectSignal.png', 'RealSignal.png', 'RealTimeReturn.png', 'temp_strategy.csv', 'BuyAndSell.csv']
     
     for img_name in required_images:
         path = os.path.join(image_folder, img_name)
@@ -156,8 +153,6 @@ def notify_by_email(stock_code, signal_type, signal_text):
             image_paths.append(path)
         else:
             print(f"警告：邮件附件图片不存在 -> {path}")
-
-    print(image_paths)        
 
     try:
         sender = EmailSender(provider_name=email_config.ACTIVE_SMTP_PROVIDER)
