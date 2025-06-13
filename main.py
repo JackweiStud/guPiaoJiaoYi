@@ -43,9 +43,10 @@ def ETFTest(code):
 if __name__ == "__main__":
     #case1 A股的电力ETF m'KeyboardInterrupt
     ETFTest("561560.SH")
-    ETFTest("588180.SH")
-    #ETFTest("159655.SH")
-    ETFTest("518880.SH") ##黄金
+    #ETFTest("588180.SH")
+    ETFTest("513160.SH")
+    #ETFTest("518880.SH") ##黄金
+    ETFTest("159915.SH") ##创业
 
 
 
