@@ -3,6 +3,8 @@ import os
 from datetime import datetime, timezone, timedelta
 import pandas as pd
 import numpy as np
+import json
+import time
 
 # 将项目根目录添加到 Python 模块搜索路径中
 # 这使得脚本可以找到 emailFile 等兄弟模块
@@ -19,7 +21,7 @@ def get_beijing_time():
     """返回当前的北京时间 (UTC+8)"""
     return datetime.now(timezone(timedelta(hours=8)))
 
-def run_trading_strategy(stock_code="588180.SH"):
+def run_trading_strategy(stock_code):
     """
     执行完整的交易策略流程：获取数据、分析信号、发送邮件。
     """
@@ -41,12 +43,12 @@ def run_trading_strategy(stock_code="588180.SH"):
 
     # 2. 实现类似 testOnlyNew 的功能，分析交易信号
     print("\n[步骤 2/3] 正在分析交易信号...")
-    signal_today, signal_text = get_trading_signal(stock_code)
-    print(f"分析完成。今日信号: {signal_text}")
+    _, signal_text = get_trading_signal(stock_code)
+    print(f"分析完成。{stock_code} 的今日信号: {signal_text}")
 
     # 3. 根据交易信号发送邮件
     print("\n[步骤 3/3] 正在准备发送邮件通知...")
-    notify_by_email(stock_code, signal_today, signal_text)
+    notify_by_email(stock_code, signal_text)
 
     print("\n" + "="*50)
     print("自动化流程执行完毕。")
@@ -64,15 +66,37 @@ def get_trading_signal(stock_code):
         print(f"错误：数据文件不存在 -> {filepath}")
         return "error", "数据文件丢失"
 
-    # 使用与 testOnlyNew 中相同的策略参数
-    params = {
-        'short_window': np.int64(3), 'long_window': np.int64(12),
-        'volume_mavg_Value': np.int64(5), 'MaRateUp': np.float64(1.5),
-        'VolumeSellRate': np.float64(3.0), 'rsi_period': np.int64(11),
-        'rsiValueThd': np.int64(29), 'rsiRateUp': np.float64(1.4),
-        'divergence_threshold': np.float64(0.04)
-    }
+    # 从JSON文件加载策略参数
+    params_path = os.path.join(project_root, 'strategy_params.json')
+    try:
+        with open(params_path, 'r', encoding='utf-8') as f:
+            # 移除JSON文件中的注释行 (以 // 开头)
+            lines = f.readlines()
+            json_str = "".join([line for line in lines if not line.strip().startswith('//')])
+            all_params = json.loads(json_str)
+        
+        # 获取对应 stock_code 的参数，如果不存在则使用 default 参数
+        stock_params = all_params.get(stock_code, all_params['default'])
+        
+        # 将从 JSON 中读取的参数转换为 NumPy 特定类型
+        params = {
+            'short_window': np.int64(stock_params['short_window']), 
+            'long_window': np.int64(stock_params['long_window']),
+            'volume_mavg_Value': np.int64(stock_params['volume_mavg_Value']), 
+            'MaRateUp': np.float64(stock_params['MaRateUp']),
+            'VolumeSellRate': np.float64(stock_params['VolumeSellRate']), 
+            'rsi_period': np.int64(stock_params['rsi_period']),
+            'rsiValueThd': np.int64(stock_params['rsiValueThd']), 
+            'rsiRateUp': np.float64(stock_params['rsiRateUp']),
+            'divergence_threshold': np.float64(stock_params['divergence_threshold'])
+        }
+        print(f"已为 {stock_code} 从 'strategy_params.json' 加载策略参数。")
 
+    except (FileNotFoundError, KeyError) as e:
+        print(f"警告: 无法从 'strategy_params.json' 加载参数 (错误: {e})。将使用代码中定义的默认参数。")
+    
+    # 策略执行起始时间
+    statTime='2024-01-01'
     try:
         performance_stats = strategyFunc(
             filepath=filepath,
@@ -82,11 +106,15 @@ def get_trading_signal(stock_code):
             rsiValueThd=params['rsiValueThd'], rsiRateUp=params['rsiRateUp'],
             divergence_threshold=params['divergence_threshold'],
             # 其他回测参数，保持与 testOnlyNew 一致
-            initial_capital=10000.0, commission=0.0003, max_portfolio_allocation_pct=1,
-            buy_increment_pct_of_initial_capital=1, sell_decrement_pct_of_current_shares=1,
+            initial_capital=10000.0, 
+            commission=0.0003, 
+            max_portfolio_allocation_pct=1,
+            buy_increment_pct_of_initial_capital=1, 
+            sell_decrement_pct_of_current_shares=1,
             min_shares_per_trade=100,
             # 设置时间范围，确保包含今天
-            statTime='2025-01-01', endTime=get_beijing_time().strftime('%Y-%m-%d'),
+            statTime = statTime, 
+            endTime=get_beijing_time().strftime('%Y-%m-%d'),
             plot_results=True,  # 需要设置为True以生成图片
             verbose=False
         )
@@ -122,29 +150,30 @@ def get_trading_signal(stock_code):
         print(traceback.format_exc())
         return "error", "策略执行出错"
 
-def notify_by_email(stock_code, signal_type, signal_text):
+def notify_by_email(stock_code, signal_text):
     """
-    根据信号发送邮件。
+    根据信号发送邮件，增加5次重试逻辑。
     """
     subject = f"交易信号提醒: {stock_code} - {signal_text}"
     body = f"""
-你好，
+            你好，
 
-这是来自您的自动化交易策略机器人的通知。
+            这是来自您的自动化策略信号识别系统机器人的通知。
 
-标的: {stock_code}
-时间: {get_beijing_time().strftime('%Y-%m-%d %H:%M:%S')}
-信号: {signal_text}
+            标的: {stock_code}
+            时间: {get_beijing_time().strftime('%Y-%m-%d %H:%M:%S')}
+            交易信号: {signal_text}
 
-请查看附件图片获取详细图表。
+            请查看附件图片获取详细图表。
 
-祝好，
-交易机器人
-"""
+            祝好，
+            交易机器人
+            """
     
     image_paths = []
     # 无条件附上图片
     image_folder = os.path.join(project_root, 'pic')
+    print(f"图片文件夹路径为: {image_folder}")
     required_images = ['expectSignal.png', 'Strategy_Performance_Dashboard.png', 'temp_strategy.csv', 'divergence_ratio.csv', 'BuyAndSell.csv']
     
     for img_name in required_images:
@@ -154,40 +183,69 @@ def notify_by_email(stock_code, signal_type, signal_text):
         else:
             print(f"警告：邮件附件图片不存在 -> {path}")
 
-    try:
-        sender = EmailSender(provider_name=email_config.ACTIVE_SMTP_PROVIDER)
-        success = sender.send(
-            recipient_emails=email_config.DEFAULT_RECIPIENTS["to"],
-            cc_emails=email_config.DEFAULT_RECIPIENTS["cc"],
-            subject=subject,
-            body_text=body,
-            image_paths=image_paths
-        )
-        if success:
-            print("邮件通知已成功发送。")
-        else:
-            print("错误：邮件发送失败，请检查 emailFile/mailFun.py 的输出日志。")
-    except Exception as e:
-        print(f"错误：初始化或发送邮件时发生严重错误: {e}")
+    max_retries = 5
+    delay_seconds = 10
+
+    for attempt in range(max_retries):
+        try:
+            sender = EmailSender(provider_name=email_config.ACTIVE_SMTP_PROVIDER)
+            time.sleep(2)
+            success = sender.send(
+                recipient_emails=email_config.DEFAULT_RECIPIENTS["to"],
+                cc_emails=email_config.DEFAULT_RECIPIENTS["cc"],
+                subject=subject,
+                body_text=body,
+                image_paths=image_paths
+            )
+            if success:
+                print("邮件通知已成功发送。")
+                return
+            else:
+                print(f"邮件发送返回失败状态 (尝试 {attempt + 1}/{max_retries})")
+        except Exception as e:
+            print(f"错误：初始化或发送邮件时发生严重错误 (尝试 {attempt + 1}/{max_retries}): {e}")
+
+        if attempt < max_retries - 1:
+            print(f"将在 {delay_seconds} 秒后重试...")
+            time.sleep(delay_seconds)
+    
+    print("错误：邮件发送失败，已达到最大重试次数。请检查 emailFile/mailFun.py 的输出日志。")
 
 def notify_error(subject, body):
     """
-    当发生严重错误时，发送不带附件的纯文本邮件。
+    当发生严重错误时，发送不带附件的纯文本邮件，增加5次重试逻辑。
     """
     print(f"正在发送错误报告邮件: {subject}")
-    try:
-        sender = EmailSender(provider_name=email_config.ACTIVE_SMTP_PROVIDER)
-        sender.send(
-            recipient_emails=email_config.DEFAULT_RECIPIENTS["to"],
-            subject=f"[策略机器人错误] {subject}",
-            body_text=f"错误报告:\n\n{body}"
-        )
-        print("错误报告邮件已发送。")
-    except Exception as e:
-        print(f"错误：发送错误报告邮件失败: {e}")
+    max_retries = 5
+    delay_seconds = 10
 
+    for attempt in range(max_retries):
+        try:
+            sender = EmailSender(provider_name=email_config.ACTIVE_SMTP_PROVIDER)
+            success = sender.send(
+                recipient_emails=email_config.DEFAULT_RECIPIENTS["to"],
+                subject=f"[策略机器人错误] {subject}",
+                body_text=f"错误报告:\n\n{body}"
+            )
+            if success:
+                print("错误报告邮件已发送。")
+                return
+            else:
+                print(f"错误报告邮件发送返回失败状态 (尝试 {attempt + 1}/{max_retries})")
+        except Exception as e:
+            print(f"错误：发送错误报告邮件失败 (尝试 {attempt + 1}/{max_retries}): {e}")
+
+        if attempt < max_retries - 1:
+            print(f"将在 {delay_seconds} 秒后重试...")
+            time.sleep(delay_seconds)
+    
+    print("错误：发送错误报告邮件失败，已达到最大重试次数。")
+
+def autoProcessETF(target_stock_code):
+    # 要监控的ETF代码
+    #target_stock_code = "58818 .SH"
+    run_trading_strategy(target_stock_code)
 
 if __name__ == "__main__":
-    # 要监控的ETF代码
-    target_stock_code = "588180.SH"
-    run_trading_strategy(target_stock_code)
+    #autoProcessETF("588180.SH") #科创50
+    autoProcessETF("159915.SH") ##创业

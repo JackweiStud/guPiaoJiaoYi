@@ -71,7 +71,8 @@ def simple_ma_strategy(data, short_window, long_window,
                          rsiRateUp=1.5,
                          divergence_threshold=0.06,
                          VolumeSellRate=4.5,
-                         plot_chart=False):
+                         plot_chart=False,
+                         pic_folder='pic'):
     """
     简单均线交叉策略
     :param data: DataFrame, 包含 'CloseValue', 'OpenValue', 'HighValue', 'LowValue', 'Volume'
@@ -85,6 +86,7 @@ def simple_ma_strategy(data, short_window, long_window,
     :param divergence_threshold: 乖离率阈值
     :param VolumeSellRate: 成交量卖出倍数
     :param plot_chart: bool, 是否绘制K线和信号图
+    :param pic_folder: str, 图片和CSV保存的文件夹路径
     :return: Series, 包含信号 (1: 买入, -1: 卖出, 0: 持有)
     """
     signals = pd.DataFrame(index=data.index)
@@ -136,7 +138,7 @@ def simple_ma_strategy(data, short_window, long_window,
         'rsi_buy_condition': rsi_buy_condition,
         'buy_condition': buy_condition
     })
-    divergence_df.to_csv('pic/divergence_ratio.csv', index=False)
+    divergence_df.to_csv(os.path.join(pic_folder, 'divergence_ratio.csv'), index=False)
     
     
     # 卖出条件：死叉、或收盘低于长期均线，另外若收盘价格大于短期均线，暂时不卖出
@@ -156,11 +158,13 @@ def simple_ma_strategy(data, short_window, long_window,
     signals.loc[signals.index[:short_window], 'signal'] = 0
 
     # 新增功能：将信号保存到CSV文件
-    signals['signal'].to_csv('pic/temp_strategy.csv', header=True)
+    signals['signal'].to_csv(os.path.join(pic_folder, 'temp_strategy.csv'), header=True)
     
     # 新增绘图功能
     if plot_chart:
-        fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(16, 9), sharex=True, gridspec_kw={'height_ratios': [3, 1]})
+        fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(16, 9), sharex=True, 
+                                     gridspec_kw={'height_ratios': [3, 1]},
+                                     constrained_layout=True)
         fig.suptitle('交易策略下的预期信号', fontsize=16)
 
         # --- 1. K线图 & 均线 & 买卖点 ---
@@ -216,8 +220,7 @@ def simple_ma_strategy(data, short_window, long_window,
             ax2.set_xticks(tick_indices)
             ax2.set_xticklabels(tick_labels, rotation=30, ha='right')
 
-        fig.tight_layout(rect=[0, 0, 1, 0.9]) # 为主标题调整布局
-        fig.savefig('pic/expectSignal.png')
+        fig.savefig(os.path.join(pic_folder, 'expectSignal.png'))
         plt.show()
 
 
@@ -302,7 +305,8 @@ def run_backtest(data,
                  min_shares_per_trade=100, # 最小交易股数 (ETF通常100份)
                  verbose=True,
                  statTime=None, 
-                 endTime=None
+                 endTime=None,
+                 pic_folder='pic'
                 ):
     
     # 根据回测时间范围筛选数据
@@ -425,7 +429,7 @@ def run_backtest(data,
     portfolio_info['returns'] = portfolio_info['returns'].map('{:.2%}'.format)
     portfolio_info['cumulative_returns'] = portfolio_info['cumulative_returns'].map('{:.2%}'.format)
     portfolio_info.index.name = 'DateTime'
-    portfolio_info.to_csv('pic/BuyAndSell.csv', float_format='%.2f')
+    portfolio_info.to_csv(os.path.join(pic_folder, 'BuyAndSell.csv'), float_format='%.2f')
     return portfolio
 
 
@@ -568,7 +572,8 @@ def _plot_candlestick(ax, plot_data, title="K线图及交易信号"):
 def plot_performance(portfolio_df, benchmark_data=None, 
                      short_window=5, long_window=21, # 均线值
                      volume_mavg_Value=10, #成交量x日均值
-                     rsi_period=13): # RSI周期
+                     rsi_period=13, # RSI周期
+                     pic_folder='pic'):
     """
     绘制集成化的绩效分析仪表盘
     :param portfolio_df: DataFrame, 包含 'total', 'drawdown', 'OpenValue', ... 'signal' 列
@@ -577,6 +582,7 @@ def plot_performance(portfolio_df, benchmark_data=None,
     :param long_window: 长期均线窗口
     :param volume_mavg_Value: 成交量均线窗口
     :param rsi_period: RSI 计算周期
+    :param pic_folder: str, 图片和CSV保存的文件夹路径
     """
     required_cols = ['OpenValue', 'HighValue', 'LowValue', 'CloseValue', 'Volume', 'signal', 'total', 'drawdown']
     if not all(col in portfolio_df.columns for col in required_cols):
@@ -604,10 +610,10 @@ def plot_performance(portfolio_df, benchmark_data=None,
     plot_data['rsi'] = 100 - (100 / (1 + (avg_gain / avg_loss)))
 
     # --- 2. 图表布局 (新顺序) ---
-    fig = plt.figure(figsize=(20, 18))
+    fig = plt.figure(figsize=(20, 18), constrained_layout=True)
     fig.suptitle('策略绩效分析仪表盘', fontsize=20)
     # K线(6), 成交量(1.5), RSI(1), 净值(2), 回撤(1)
-    gs = fig.add_gridspec(5, 1, height_ratios=[6, 1.5, 1, 2, 1], hspace=0.3)
+    gs = fig.add_gridspec(5, 1, height_ratios=[6, 1.5, 1, 2, 1])
     
     ax_kline = fig.add_subplot(gs[0])
     ax_volume = fig.add_subplot(gs[1], sharex=ax_kline)
@@ -685,8 +691,7 @@ def plot_performance(portfolio_df, benchmark_data=None,
     # 为所有子图添加十字光标功能
     add_crosshair_cursor(fig, ax_kline, ax_volume, plot_data)
     
-    fig.tight_layout(rect=[0, 0.03, 1, 0.98]) # 调整布局以适应主标题
-    fig.savefig('pic/Strategy_Performance_Dashboard.png')
+    fig.savefig(os.path.join(pic_folder, 'Strategy_Performance_Dashboard.png'))
     plt.show()
 
 
@@ -737,6 +742,17 @@ def strategyFunc(filepath,
              statTime=None, endTime=None,
              plot_results=True, verbose=True):
 
+        # 从filepath推断出根目录和pic目录
+        # filepath is like '.../stock_data/588180/588180_Day.csv'
+        # We want '.../pic'
+        stock_data_folder = os.path.dirname(os.path.dirname(filepath)) # .../stock_data
+        project_root_folder = os.path.dirname(stock_data_folder) # .../
+        pic_folder = os.path.join(project_root_folder, 'pic')
+
+        # 确保pic文件夹存在
+        os.makedirs(pic_folder, exist_ok=True)
+        print(f"图片和CSV将保存到: {pic_folder}")
+
         # 1. 加载数据
         etf_data = load_etf_data(filepath)
         
@@ -753,7 +769,8 @@ def strategyFunc(filepath,
                                      rsiRateUp=rsiRateUp,
                                      divergence_threshold=divergence_threshold,
                                      VolumeSellRate=VolumeSellRate,
-                                     plot_chart=plot_results)
+                                     plot_chart=plot_results,
+                                     pic_folder=pic_folder)
 
         # 3. 执行回测
         portfolio_results_df = run_backtest(
@@ -767,7 +784,8 @@ def strategyFunc(filepath,
             min_shares_per_trade=min_shares_per_trade,
             verbose=verbose,
             statTime=statTime,
-            endTime=endTime
+            endTime=endTime,
+            pic_folder=pic_folder
         )
 
         # 4. 计算并展示绩效
@@ -787,7 +805,8 @@ def strategyFunc(filepath,
                              short_window, 
                              long_window, 
                              volume_mavg_Value,
-                             rsi_period)
+                             rsi_period,
+                             pic_folder=pic_folder)
         
         if verbose:
             print("\n回测完成。")

@@ -40,4 +40,5 @@ certifi：pip install --upgrade certifi
 给这个规则起一个你能看懂的名字，比如 Allow Gmail SMTP。
 点击 "完成"。
 
+#powershell
 Test-NetConnection -ComputerName smtp.gmail.com -Port 465
