@@ -75,8 +75,8 @@ def get_trading_signal(stock_code):
             json_str = "".join([line for line in lines if not line.strip().startswith('//')])
             all_params = json.loads(json_str)
         
-        # 获取对应 stock_code 的参数，如果不存在则使用 default 参数
-        stock_params = all_params.get(stock_code, all_params['default'])
+        # 获取对应 symbol 的参数，如果不存在则使用 default 参数
+        stock_params = all_params.get(symbol, all_params['default'])
         
         # 将从 JSON 中读取的参数转换为 NumPy 特定类型
         params = {
@@ -90,7 +90,7 @@ def get_trading_signal(stock_code):
             'rsiRateUp': np.float64(stock_params['rsiRateUp']),
             'divergence_threshold': np.float64(stock_params['divergence_threshold'])
         }
-        print(f"已为 {stock_code} 从 'strategy_params.json' 加载策略参数。")
+        print(f"已为 {symbol} 从 'strategy_params.json' 加载策略参数。")
 
     except (FileNotFoundError, KeyError) as e:
         print(f"警告: 无法从 'strategy_params.json' 加载参数 (错误: {e})。将使用代码中定义的默认参数。")
@@ -100,6 +100,7 @@ def get_trading_signal(stock_code):
     try:
         performance_stats = strategyFunc(
             filepath=filepath,
+            symbol=symbol,
             short_window=params['short_window'], long_window=params['long_window'],
             volume_mavg_Value=params['volume_mavg_Value'], MaRateUp=params['MaRateUp'],
             VolumeSellRate=params['VolumeSellRate'], rsi_period=params['rsi_period'],
@@ -172,9 +173,14 @@ def notify_by_email(stock_code, signal_text):
     
     image_paths = []
     # 无条件附上图片
+    symbol = stock_code.split('.')[0]
     image_folder = os.path.join(project_root, 'pic')
     print(f"图片文件夹路径为: {image_folder}")
-    required_images = ['expectSignal.png', 'Strategy_Performance_Dashboard.png', 'temp_strategy.csv', 'divergence_ratio.csv', 'BuyAndSell.csv']
+    required_images = [f'{symbol}_expectSignal.png', 
+                       f'{symbol}_Strategy_Performance_Dashboard.png',
+                       f'{symbol}_temp_strategy.csv', 
+                       f'{symbol}_divergence_ratio.csv', 
+                       f'{symbol}_BuyAndSell.csv']
     
     for img_name in required_images:
         path = os.path.join(image_folder, img_name)
@@ -183,7 +189,7 @@ def notify_by_email(stock_code, signal_text):
         else:
             print(f"警告：邮件附件图片不存在 -> {path}")
 
-    max_retries = 5
+    max_retries = 3
     delay_seconds = 10
 
     for attempt in range(max_retries):
@@ -247,5 +253,5 @@ def autoProcessETF(target_stock_code):
     run_trading_strategy(target_stock_code)
 
 if __name__ == "__main__":
-    #autoProcessETF("588180.SH") #科创50
+    autoProcessETF("588180.SH") #科创50
     autoProcessETF("159915.SH") ##创业

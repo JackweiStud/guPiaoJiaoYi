@@ -16,7 +16,7 @@ certifi：pip install --upgrade certifi
 ![Uploading image.png…]()
 
 
-## 本地PC若无法发生email网络诊断
+## 本地PC若无法发生email网络诊断 
 1、VPN设置为全局网络
 2、步骤：在 Windows 防火墙中创建出站规则
 打开高级防火墙设置
@@ -40,5 +40,5 @@ certifi：pip install --upgrade certifi
 给这个规则起一个你能看懂的名字，比如 Allow Gmail SMTP。
 点击 "完成"。
 
-#powershell
+#powershell -- 国内可以不开VPN
 Test-NetConnection -ComputerName smtp.gmail.com -Port 465
