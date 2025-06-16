@@ -116,7 +116,7 @@ def get_trading_signal(stock_code):
             # 设置时间范围，确保包含今天
             statTime = statTime, 
             endTime=get_beijing_time().strftime('%Y-%m-%d'),
-            plot_results=True,  # 需要设置为True以生成图片
+            plot_results=False,  # 需要设置为True以生成图片
             verbose=False
         )
 
