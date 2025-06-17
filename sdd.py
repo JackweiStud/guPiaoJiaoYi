@@ -8,10 +8,19 @@ from datetime import datetime
 import platform
 import matplotlib.font_manager as fm
 import os
+import json
+import time
+from datetime import datetime, timezone, timedelta
+
 project_root = os.path.dirname((os.path.abspath(__file__)))
 sys.path.append(project_root)
 print(project_root)
 
+
+
+def get_beijing_time():
+    """返回当前的北京时间 (UTC+8)"""
+    return datetime.now(timezone(timedelta(hours=8)))
 
 # 动态设置matplotlib中文字体，以适应不同操作系统
 def set_chinese_font():
@@ -71,7 +80,7 @@ def simple_ma_strategy(data, symbol, short_window, long_window,
                          rsiRateUp=1.5,
                          divergence_threshold=0.06,
                          VolumeSellRate=4.5,
-                         plot_chart=False,
+                         plot_chart=1,
                          pic_folder='pic'
                          ):
     """
@@ -86,7 +95,7 @@ def simple_ma_strategy(data, symbol, short_window, long_window,
     :param rsiRateUp: RSI超卖倍数
     :param divergence_threshold: 乖离率阈值
     :param VolumeSellRate: 成交量卖出倍数
-    :param plot_chart: bool, 是否绘制K线和信号图
+    :param plot_chart: int, 是否绘制K线和信号图 (0:不绘制, 1:仅保存,2: 保存图片并显示图表)
     :param pic_folder: str, 图片和CSV保存的文件夹路径
     :return: Series, 包含信号 (1: 买入, -1: 卖出, 0: 持有)
     """
@@ -162,69 +171,72 @@ def simple_ma_strategy(data, symbol, short_window, long_window,
     signals['signal'].to_csv(os.path.join(pic_folder, f'{symbol}_temp_strategy.csv'), header=True)
     
     # 新增绘图功能
-    #if plot_chart:
-    fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(16, 9), sharex=True, 
-                                    gridspec_kw={'height_ratios': [3, 1]},
-                                    constrained_layout=True)
-    fig.suptitle('交易策略下的预期信号', fontsize=16)
+    if plot_chart >= 1:
+        fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(16, 9), sharex=True, 
+                                        gridspec_kw={'height_ratios': [3, 1]},
+                                        constrained_layout=True)
+        fig.suptitle('交易策略下的预期信号', fontsize=16)
 
-    # --- 1. K线图 & 均线 & 买卖点 ---
-    # 为了避免非交易日造成K线图断裂，我们使用数值索引绘图，然后将X轴标签设置为日期
-    plot_data = data.join(signals)
-    plot_data_reset = plot_data.reset_index()
+        # --- 1. K线图 & 均线 & 买卖点 ---
+        # 为了避免非交易日造成K线图断裂，我们使用数值索引绘图，然后将X轴标签设置为日期
+        plot_data = data.join(signals)
+        plot_data_reset = plot_data.reset_index()
 
-    # 计算7日均量
-    plot_data_reset['volume_ma'] = plot_data_reset['Volume'].rolling(window=7, min_periods=1).mean()
+        # 计算7日均量
+        plot_data_reset['volume_ma'] = plot_data_reset['Volume'].rolling(window=7, min_periods=1).mean()
 
-    up = plot_data_reset[plot_data_reset['CloseValue'] >= plot_data_reset['OpenValue']]
-    down = plot_data_reset[plot_data_reset['CloseValue'] < plot_data_reset['OpenValue']]
+        up = plot_data_reset[plot_data_reset['CloseValue'] >= plot_data_reset['OpenValue']]
+        down = plot_data_reset[plot_data_reset['CloseValue'] < plot_data_reset['OpenValue']]
 
-    # 使用整数索引绘图
-    # 绘制影线
-    ax1.vlines(plot_data_reset.index, plot_data_reset['LowValue'], plot_data_reset['HighValue'], color=np.where(plot_data_reset['CloseValue'] >= plot_data_reset['OpenValue'], 'red', 'green'), linewidth=1)
-    # 绘制实体 (红涨绿跌)
-    ax1.vlines(up.index, up['OpenValue'], up['CloseValue'], color='red', linewidth=5)
-    ax1.vlines(down.index, down['OpenValue'], down['CloseValue'], color='green', linewidth=5)
+        # 使用整数索引绘图
+        # 绘制影线
+        ax1.vlines(plot_data_reset.index, plot_data_reset['LowValue'], plot_data_reset['HighValue'], color=np.where(plot_data_reset['CloseValue'] >= plot_data_reset['OpenValue'], 'red', 'green'), linewidth=1)
+        # 绘制实体 (红涨绿跌)
+        ax1.vlines(up.index, up['OpenValue'], up['CloseValue'], color='red', linewidth=5)
+        ax1.vlines(down.index, down['OpenValue'], down['CloseValue'], color='green', linewidth=5)
 
-    # 绘制均线
-    ax1.plot(plot_data_reset.index, plot_data_reset['short_mavg'], color='blue', label=f'短期均线({short_window})', linewidth=2)
-    ax1.plot(plot_data_reset.index, plot_data_reset['long_mavg'], color='Black', label=f'长期均线({long_window})', linewidth=2)
+        # 绘制均线
+        ax1.plot(plot_data_reset.index, plot_data_reset['short_mavg'], color='blue', label=f'短期均线({short_window})', linewidth=2)
+        ax1.plot(plot_data_reset.index, plot_data_reset['long_mavg'], color='Black', label=f'长期均线({long_window})', linewidth=2)
 
-    # 标记买卖点
-    buy_signals = plot_data_reset[plot_data_reset['signal'] == 1]
-    sell_signals = plot_data_reset[plot_data_reset['signal'] == -1]
+        # 标记买卖点
+        buy_signals = plot_data_reset[plot_data_reset['signal'] == 1]
+        sell_signals = plot_data_reset[plot_data_reset['signal'] == -1]
 
-    if not buy_signals.empty:
-        ax1.plot(buy_signals.index, buy_signals['LowValue'] * 0.98, '^', color='red', markersize=10, label='买入信号')
+        if not buy_signals.empty:
+            ax1.plot(buy_signals.index, buy_signals['LowValue'] * 0.98, '^', color='red', markersize=10, label='买入信号')
 
-    if not sell_signals.empty:
-        ax1.plot(sell_signals.index, sell_signals['HighValue'] * 1.02, 'v', color='green', markersize=10, label='卖出信号')
+        if not sell_signals.empty:
+            ax1.plot(sell_signals.index, sell_signals['HighValue'] * 1.02, 'v', color='green', markersize=10, label='卖出信号')
 
-    ax1.set_ylabel('价格')
-    ax1.legend()
-    ax1.grid(True)
+        ax1.set_ylabel('价格')
+        ax1.legend()
+        ax1.grid(True)
 
-    # --- 2. 成交量图 ---
-    ax2.bar(up.index, up['Volume'] / 10000, color='red', alpha=0.7)
-    ax2.bar(down.index, down['Volume'] / 10000, color='green', alpha=0.7)
-    ax2.plot(plot_data_reset.index, plot_data_reset['volume_ma'] / 10000, color='blue', linestyle='--', linewidth=1, label=f'{volume_mavg_Value}日均量')
-    ax2.set_ylabel('成交量(万手)')
-    ax2.legend()
-    ax2.grid(True)
-    
-    # --- 格式化 X 轴 ---
-    # 选择性地显示一些日期标签以避免拥挤
-    num_ticks = min(10, len(plot_data_reset))
-    if num_ticks > 0:
-        tick_indices = np.linspace(0, len(plot_data_reset) - 1, num_ticks, dtype=int)
-        tick_labels = plot_data_reset['DateTime'].iloc[tick_indices].dt.strftime('%Y-%m-%d')
-        ax2.set_xticks(tick_indices)
-        ax2.set_xticklabels(tick_labels, rotation=30, ha='right')
+        # --- 2. 成交量图 ---
+        ax2.bar(up.index, up['Volume'] / 10000, color='red', alpha=0.7)
+        ax2.bar(down.index, down['Volume'] / 10000, color='green', alpha=0.7)
+        ax2.plot(plot_data_reset.index, plot_data_reset['volume_ma'] / 10000, color='blue', linestyle='--', linewidth=1, label=f'{volume_mavg_Value}日均量')
+        ax2.set_ylabel('成交量(万手)')
+        ax2.legend()
+        ax2.grid(True)
+        
+        # --- 格式化 X 轴 ---
+        # 选择性地显示一些日期标签以避免拥挤
+        num_ticks = min(10, len(plot_data_reset))
+        if num_ticks > 0:
+            tick_indices = np.linspace(0, len(plot_data_reset) - 1, num_ticks, dtype=int)
+            tick_labels = plot_data_reset['DateTime'].iloc[tick_indices].dt.strftime('%Y-%m-%d')
+            ax2.set_xticks(tick_indices)
+            ax2.set_xticklabels(tick_labels, rotation=30, ha='right')
 
-    fig.savefig(os.path.join(pic_folder, f'{symbol}_expectSignal.png'))
+        fig.savefig(os.path.join(pic_folder, f'{symbol}_expectSignal.png'))
+        #plt.close(fig)
 
-    if plot_chart:
-        plt.show()
+        if plot_chart == 2:
+            plt.show()
+        plt.close(fig)
+
 
     return signals['signal'] # 返回的是一个包含每天信号的Series
 
@@ -574,7 +586,7 @@ def plot_performance(portfolio_df, symbol, benchmark_data=None,
                      short_window=5, long_window=21, # 均线值
                      volume_mavg_Value=10, #成交量x日均值
                      rsi_period=13, # RSI周期
-                     plot_chart=True,
+                     plot_chart=2,
                      pic_folder='pic'):
     """
     绘制集成化的绩效分析仪表盘
@@ -584,6 +596,7 @@ def plot_performance(portfolio_df, symbol, benchmark_data=None,
     :param long_window: 长期均线窗口
     :param volume_mavg_Value: 成交量均线窗口
     :param rsi_period: RSI 计算周期
+    :param plot_chart: int, 控制绘图。0:不处理, 1:仅保存, 2:保存并显示
     :param pic_folder: str, 图片和CSV保存的文件夹路径
     """
     required_cols = ['OpenValue', 'HighValue', 'LowValue', 'CloseValue', 'Volume', 'signal', 'total', 'drawdown']
@@ -695,8 +708,10 @@ def plot_performance(portfolio_df, symbol, benchmark_data=None,
     
     fig.savefig(os.path.join(pic_folder, f'{symbol}_Strategy_Performance_Dashboard.png'))
     
-    if plot_chart:
+    if plot_chart == 2:
         plt.show()
+    
+    plt.close(fig)
 
 
 
@@ -724,7 +739,7 @@ from performance_analyzer import calculate_performance, plot_performance
 :param rsiRateUp: RSI超卖倍数
 :param divergence_threshold: 乖离率阈值
 :param VolumeSellRate: 成交量卖出倍数
-:param plot_results: bool, 是否绘制结果图表
+:param plot_results: int, 控制绘图和保存。0:不绘制不保存, 1:仅保存图片, 2:保存并显示图片
 :param verbose: bool, 是否打印详细日志
 """
 def strategyFunc(filepath, 
@@ -745,7 +760,7 @@ def strategyFunc(filepath,
              divergence_threshold=0.06,
              VolumeSellRate=4.5,
              statTime=None, endTime=None,
-             plot_results=True, verbose=True):
+             plot_results=2, verbose=True):
 
         # 从filepath推断出根目录和pic目录
         # filepath is like '.../stock_data/588180/588180_Day.csv'
@@ -808,13 +823,14 @@ def strategyFunc(filepath,
         plot_df = portfolio_df_for_plot.join(etf_data[['OpenValue', 'HighValue', 'LowValue', 'CloseValue', 'Volume']])
 
         # 6. 绘制图表
-        plot_performance(plot_df, symbol, benchmark_df_for_plot, 
-                            short_window, 
-                            long_window, 
-                            volume_mavg_Value,
-                            rsi_period,
-                            plot_chart=plot_results,
-                            pic_folder=pic_folder)
+        if plot_results >= 1:
+            plot_performance(plot_df, symbol, benchmark_df_for_plot, 
+                                short_window, 
+                                long_window, 
+                                volume_mavg_Value,
+                                rsi_period,
+                                plot_chart=plot_results,
+                                pic_folder=pic_folder)
         
         if verbose:
             print("\n回测完成。")
@@ -867,7 +883,7 @@ def testOnlyOk(symbol):
             VolumeSellRate=VolumeSellRate,
             statTime='2023-1-01',
             endTime='2025-9-20',
-            plot_results=True,
+            plot_results=2,
             verbose=True)
 
 
@@ -939,7 +955,7 @@ def testOnly1(symbol = "588180"):
             VolumeSellRate=VolumeSellRate,
             statTime='2022-1-01',
             endTime='2025-9-20',
-            plot_results=False,
+            plot_results=0,
             verbose=True)
 
 def testOnlyNew(symbol):
@@ -998,7 +1014,7 @@ def testOnlyNew(symbol):
         VolumeSellRate=VolumeSellRate,
         statTime='2025-1-1',
         endTime='2025-9-20',
-        plot_results=True, 
+        plot_results=2, 
         verbose=False)
 
     # 获取回测结果的 portfolio DataFrame
@@ -1073,7 +1089,7 @@ def findGoodParam(symbol,
                 min_shares_per_trade=100,
                 statTime=statTime,
                 endTime=endTime,
-                plot_results=False, # 优化时禁用绘图
+                plot_results=0, # 优化时禁用绘图
                 verbose=False      # 优化时禁用日志
             )
 
@@ -1088,7 +1104,7 @@ def findGoodParam(symbol,
             top_results.append(current_result)
             # 代码含义：对 top_results 列表进行排序，排序优先级为：年化收益率（annualized_return）优先，其次是夏普比率（sharpe_ratio），最后是最大回撤（max_drawdown）。reverse=True 表示从高到低排序（即年化收益率越高越靠前，夏普比率越高越靠前，最大回撤越大越靠前——注意这里如果想回撤小更优，应该是越小越靠前，通常需要取负数或不reverse）。
             #top_results.sort(key=lambda x: (x['annualized_return'], x['sharpe_ratio'], x['max_drawdown']), reverse=True)
-            top_results.sort(key=lambda x: (x['sharpe_ratio'], x['total_return'], x['max_drawdown']), reverse=True)
+            top_results.sort(key=lambda x: ( x['total_return'], x['sharpe_ratio'], x['max_drawdown']), reverse=True)
             
             if len(top_results) > 10:
                 top_results = top_results[:10]
@@ -1152,7 +1168,7 @@ def chuanyeETFParaFind():
        symbol = symbol,
        param_grid = custom_param_grid,
        statTime = '2022-1-01',
-       endTime = '2024-9-20'
+       endTime = '2025-1-01'
    )
 
 
@@ -1180,12 +1196,83 @@ def kechuang50ETFParaFind():
        endTime = '2024-9-20'
    )
 
+def testAuto(symbol):
+
+    filepath = os.path.join(project_root, 'stock_data',  f'{symbol}', f'{symbol}_Day.csv')
+
+    if not os.path.exists(filepath):
+        print(f"错误：数据文件不存在 -> {filepath}")
+        return "error", "数据文件丢失"
+
+    # 从JSON文件加载策略参数
+    params_path = os.path.join(project_root, 'strategy_params.json')
+    try:
+        with open(params_path, 'r', encoding='utf-8') as f:
+            # 移除JSON文件中的注释行 (以 // 开头)
+            lines = f.readlines()
+            json_str = "".join([line for line in lines if not line.strip().startswith('//')])
+            all_params = json.loads(json_str)
+        
+        # 获取对应 symbol 的参数，如果不存在则使用 default 参数
+        stock_params = all_params.get(symbol, all_params['default'])
+        
+        # 将从 JSON 中读取的参数转换为 NumPy 特定类型
+        params = {
+            'short_window': np.int64(stock_params['short_window']), 
+            'long_window': np.int64(stock_params['long_window']),
+            'volume_mavg_Value': np.int64(stock_params['volume_mavg_Value']), 
+            'MaRateUp': np.float64(stock_params['MaRateUp']),
+            'VolumeSellRate': np.float64(stock_params['VolumeSellRate']), 
+            'rsi_period': np.int64(stock_params['rsi_period']),
+            'rsiValueThd': np.int64(stock_params['rsiValueThd']), 
+            'rsiRateUp': np.float64(stock_params['rsiRateUp']),
+            'divergence_threshold': np.float64(stock_params['divergence_threshold'])
+        }
+        print(f"已为 {symbol} 从 'strategy_params.json' 加载策略参数。")
+
+    except (FileNotFoundError, KeyError) as e:
+        print(f"警告: 无法从 'strategy_params.json' 加载参数 (错误: {e})。将使用代码中定义的默认参数。")
+    
+    # 策略执行起始时间
+    statTime='2024-01-01'
+
+    performance_stats = strategyFunc(
+            filepath=filepath,
+            symbol=symbol,
+            short_window=params['short_window'], long_window=params['long_window'],
+            volume_mavg_Value=params['volume_mavg_Value'], MaRateUp=params['MaRateUp'],
+            VolumeSellRate=params['VolumeSellRate'], rsi_period=params['rsi_period'],
+            rsiValueThd=params['rsiValueThd'], rsiRateUp=params['rsiRateUp'],
+            divergence_threshold=params['divergence_threshold'],
+            # 其他回测参数，保持与 testOnlyNew 一致
+            initial_capital=10000.0, 
+            commission=0.0003, 
+            max_portfolio_allocation_pct=1,
+            buy_increment_pct_of_initial_capital=1, 
+            sell_decrement_pct_of_current_shares=1,
+            min_shares_per_trade=100,
+            # 设置时间范围，确保包含今天
+            statTime = statTime, 
+            endTime=get_beijing_time().strftime('%Y-%m-%d'),
+            plot_results=1,  # 需要设置为True以生成图片
+            verbose=True
+        )
+    
+
+
+
+    
+
+
 if __name__ == "__main__":
    #testOnlyOk(symbol = "588180") #固定参数测试
 
    #testOnlyOk(symbol = "159915") #固定参数测试
-   testOnly1(symbol = "588180")
+   #testOnly1(symbol = "588180")
    #chuanyeETFParaFind()
    #kechuang50ETFParaFind()
 
    #testOnlyNew("588180")
+
+   testAuto(symbol = "159915")
+   #testAuto(symbol = "588180")
