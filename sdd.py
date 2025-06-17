@@ -1234,7 +1234,7 @@ def testAuto(symbol):
         print(f"警告: 无法从 'strategy_params.json' 加载参数 (错误: {e})。将使用代码中定义的默认参数。")
     
     # 策略执行起始时间
-    statTime='2024-01-01'
+    statTime='2022-01-01'
 
     performance_stats = strategyFunc(
             filepath=filepath,
@@ -1274,5 +1274,6 @@ if __name__ == "__main__":
 
    #testOnlyNew("588180")
 
-   testAuto(symbol = "159915")
+   #testAuto(symbol = "159915")
    #testAuto(symbol = "588180")
+   testAuto(symbol = "513160") # 港股
