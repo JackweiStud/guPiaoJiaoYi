@@ -1,0 +1,853 @@
+Top 50 Parameter Combinations for 513160
+Ranked by Total Return, then Sharpe Ratio, then Max Drawdown
+==================================================
+Rank 1:
+  Sharpe Ratio: 1.28
+  Total Return: 96.18%
+  Max Drawdown: -14.71%
+  Annualized Return: 26.35%
+  Parameters: {
+  "short_window": 3,
+  "long_window": 12,
+  "volume_mavg_Value": 7,
+  "MaRateUp": 1.5,
+  "VolumeSellRate": 5.0,
+  "rsi_period": 9,
+  "rsiValueThd": 34,
+  "rsiRateUp": 1,
+  "divergence_threshold": 0.06
+}
+--------------------
+Rank 2:
+  Sharpe Ratio: 1.23
+  Total Return: 95.86%
+  Max Drawdown: -17.57%
+  Annualized Return: 26.28%
+  Parameters: {
+  "short_window": 4,
+  "long_window": 10,
+  "volume_mavg_Value": 7,
+  "MaRateUp": 1.5,
+  "VolumeSellRate": 5.0,
+  "rsi_period": 9,
+  "rsiValueThd": 34,
+  "rsiRateUp": 1,
+  "divergence_threshold": 0.04
+}
+--------------------
+Rank 3:
+  Sharpe Ratio: 1.22
+  Total Return: 95.36%
+  Max Drawdown: -17.60%
+  Annualized Return: 26.17%
+  Parameters: {
+  "short_window": 3,
+  "long_window": 10,
+  "volume_mavg_Value": 7,
+  "MaRateUp": 1.5,
+  "VolumeSellRate": 5.0,
+  "rsi_period": 9,
+  "rsiValueThd": 34,
+  "rsiRateUp": 1,
+  "divergence_threshold": 0.04
+}
+--------------------
+Rank 4:
+  Sharpe Ratio: 1.22
+  Total Return: 94.93%
+  Max Drawdown: -15.22%
+  Annualized Return: 26.07%
+  Parameters: {
+  "short_window": 3,
+  "long_window": 12,
+  "volume_mavg_Value": 7,
+  "MaRateUp": 1.5,
+  "VolumeSellRate": 5.0,
+  "rsi_period": 9,
+  "rsiValueThd": 34,
+  "rsiRateUp": 1,
+  "divergence_threshold": 0.04
+}
+--------------------
+Rank 5:
+  Sharpe Ratio: 1.28
+  Total Return: 94.00%
+  Max Drawdown: -17.28%
+  Annualized Return: 25.86%
+  Parameters: {
+  "short_window": 4,
+  "long_window": 10,
+  "volume_mavg_Value": 11,
+  "MaRateUp": 1.5,
+  "VolumeSellRate": 3.0,
+  "rsi_period": 7,
+  "rsiValueThd": 34,
+  "rsiRateUp": 1,
+  "divergence_threshold": 0.04
+}
+--------------------
+Rank 6:
+  Sharpe Ratio: 1.22
+  Total Return: 93.47%
+  Max Drawdown: -15.95%
+  Annualized Return: 25.74%
+  Parameters: {
+  "short_window": 3,
+  "long_window": 10,
+  "volume_mavg_Value": 7,
+  "MaRateUp": 1.5,
+  "VolumeSellRate": 5.0,
+  "rsi_period": 11,
+  "rsiValueThd": 34,
+  "rsiRateUp": 1,
+  "divergence_threshold": 0.04
+}
+--------------------
+Rank 7:
+  Sharpe Ratio: 1.22
+  Total Return: 93.01%
+  Max Drawdown: -14.71%
+  Annualized Return: 25.64%
+  Parameters: {
+  "short_window": 4,
+  "long_window": 10,
+  "volume_mavg_Value": 7,
+  "MaRateUp": 1.5,
+  "VolumeSellRate": 5.0,
+  "rsi_period": 11,
+  "rsiValueThd": 34,
+  "rsiRateUp": 1,
+  "divergence_threshold": 0.04
+}
+--------------------
+Rank 8:
+  Sharpe Ratio: 1.20
+  Total Return: 92.39%
+  Max Drawdown: -17.57%
+  Annualized Return: 25.50%
+  Parameters: {
+  "short_window": 4,
+  "long_window": 10,
+  "volume_mavg_Value": 7,
+  "MaRateUp": 1.5,
+  "VolumeSellRate": 5.0,
+  "rsi_period": 9,
+  "rsiValueThd": 34,
+  "rsiRateUp": 1,
+  "divergence_threshold": 0.06
+}
+--------------------
+Rank 9:
+  Sharpe Ratio: 1.22
+  Total Return: 92.04%
+  Max Drawdown: -14.71%
+  Annualized Return: 25.42%
+  Parameters: {
+  "short_window": 4,
+  "long_window": 10,
+  "volume_mavg_Value": 5,
+  "MaRateUp": 1.5,
+  "VolumeSellRate": 4.0,
+  "rsi_period": 11,
+  "rsiValueThd": 34,
+  "rsiRateUp": 1,
+  "divergence_threshold": 0.04
+}
+--------------------
+Rank 10:
+  Sharpe Ratio: 1.22
+  Total Return: 92.04%
+  Max Drawdown: -14.71%
+  Annualized Return: 25.42%
+  Parameters: {
+  "short_window": 4,
+  "long_window": 10,
+  "volume_mavg_Value": 5,
+  "MaRateUp": 1.5,
+  "VolumeSellRate": 5.0,
+  "rsi_period": 11,
+  "rsiValueThd": 34,
+  "rsiRateUp": 1,
+  "divergence_threshold": 0.04
+}
+--------------------
+Rank 11:
+  Sharpe Ratio: 1.22
+  Total Return: 91.40%
+  Max Drawdown: -17.28%
+  Annualized Return: 25.28%
+  Parameters: {
+  "short_window": 4,
+  "long_window": 10,
+  "volume_mavg_Value": 11,
+  "MaRateUp": 1.5,
+  "VolumeSellRate": 4.0,
+  "rsi_period": 7,
+  "rsiValueThd": 34,
+  "rsiRateUp": 1,
+  "divergence_threshold": 0.04
+}
+--------------------
+Rank 12:
+  Sharpe Ratio: 1.22
+  Total Return: 91.40%
+  Max Drawdown: -17.28%
+  Annualized Return: 25.28%
+  Parameters: {
+  "short_window": 4,
+  "long_window": 10,
+  "volume_mavg_Value": 11,
+  "MaRateUp": 1.5,
+  "VolumeSellRate": 5.0,
+  "rsi_period": 7,
+  "rsiValueThd": 34,
+  "rsiRateUp": 1,
+  "divergence_threshold": 0.04
+}
+--------------------
+Rank 13:
+  Sharpe Ratio: 1.17
+  Total Return: 91.38%
+  Max Drawdown: -17.60%
+  Annualized Return: 25.27%
+  Parameters: {
+  "short_window": 3,
+  "long_window": 10,
+  "volume_mavg_Value": 7,
+  "MaRateUp": 1.5,
+  "VolumeSellRate": 5.0,
+  "rsi_period": 7,
+  "rsiValueThd": 34,
+  "rsiRateUp": 1,
+  "divergence_threshold": 0.04
+}
+--------------------
+Rank 14:
+  Sharpe Ratio: 1.14
+  Total Return: 91.23%
+  Max Drawdown: -18.74%
+  Annualized Return: 25.24%
+  Parameters: {
+  "short_window": 3,
+  "long_window": 14,
+  "volume_mavg_Value": 7,
+  "MaRateUp": 1.5,
+  "VolumeSellRate": 5.0,
+  "rsi_period": 9,
+  "rsiValueThd": 34,
+  "rsiRateUp": 1,
+  "divergence_threshold": 0.04
+}
+--------------------
+Rank 15:
+  Sharpe Ratio: 1.23
+  Total Return: 91.06%
+  Max Drawdown: -14.71%
+  Annualized Return: 25.20%
+  Parameters: {
+  "short_window": 4,
+  "long_window": 10,
+  "volume_mavg_Value": 5,
+  "MaRateUp": 1.5,
+  "VolumeSellRate": 4.0,
+  "rsi_period": 7,
+  "rsiValueThd": 30,
+  "rsiRateUp": 1,
+  "divergence_threshold": 0.04
+}
+--------------------
+Rank 16:
+  Sharpe Ratio: 1.23
+  Total Return: 91.06%
+  Max Drawdown: -14.71%
+  Annualized Return: 25.20%
+  Parameters: {
+  "short_window": 4,
+  "long_window": 10,
+  "volume_mavg_Value": 5,
+  "MaRateUp": 1.5,
+  "VolumeSellRate": 5.0,
+  "rsi_period": 7,
+  "rsiValueThd": 30,
+  "rsiRateUp": 1,
+  "divergence_threshold": 0.04
+}
+--------------------
+Rank 17:
+  Sharpe Ratio: 1.21
+  Total Return: 90.87%
+  Max Drawdown: -14.71%
+  Annualized Return: 25.15%
+  Parameters: {
+  "short_window": 3,
+  "long_window": 12,
+  "volume_mavg_Value": 5,
+  "MaRateUp": 1.5,
+  "VolumeSellRate": 4.0,
+  "rsi_period": 9,
+  "rsiValueThd": 34,
+  "rsiRateUp": 1,
+  "divergence_threshold": 0.06
+}
+--------------------
+Rank 18:
+  Sharpe Ratio: 1.21
+  Total Return: 90.87%
+  Max Drawdown: -14.71%
+  Annualized Return: 25.15%
+  Parameters: {
+  "short_window": 3,
+  "long_window": 12,
+  "volume_mavg_Value": 5,
+  "MaRateUp": 1.5,
+  "VolumeSellRate": 5.0,
+  "rsi_period": 9,
+  "rsiValueThd": 34,
+  "rsiRateUp": 1,
+  "divergence_threshold": 0.06
+}
+--------------------
+Rank 19:
+  Sharpe Ratio: 1.25
+  Total Return: 90.61%
+  Max Drawdown: -17.28%
+  Annualized Return: 25.09%
+  Parameters: {
+  "short_window": 4,
+  "long_window": 10,
+  "volume_mavg_Value": 11,
+  "MaRateUp": 1.5,
+  "VolumeSellRate": 3.0,
+  "rsi_period": 7,
+  "rsiValueThd": 34,
+  "rsiRateUp": 1,
+  "divergence_threshold": 0.06
+}
+--------------------
+Rank 20:
+  Sharpe Ratio: 1.17
+  Total Return: 90.41%
+  Max Drawdown: -14.71%
+  Annualized Return: 25.05%
+  Parameters: {
+  "short_window": 3,
+  "long_window": 12,
+  "volume_mavg_Value": 5,
+  "MaRateUp": 1.5,
+  "VolumeSellRate": 4.0,
+  "rsi_period": 9,
+  "rsiValueThd": 34,
+  "rsiRateUp": 1,
+  "divergence_threshold": 0.04
+}
+--------------------
+Rank 21:
+  Sharpe Ratio: 1.17
+  Total Return: 90.41%
+  Max Drawdown: -14.71%
+  Annualized Return: 25.05%
+  Parameters: {
+  "short_window": 3,
+  "long_window": 12,
+  "volume_mavg_Value": 5,
+  "MaRateUp": 1.5,
+  "VolumeSellRate": 5.0,
+  "rsi_period": 9,
+  "rsiValueThd": 34,
+  "rsiRateUp": 1,
+  "divergence_threshold": 0.04
+}
+--------------------
+Rank 22:
+  Sharpe Ratio: 1.17
+  Total Return: 90.35%
+  Max Drawdown: -18.12%
+  Annualized Return: 25.03%
+  Parameters: {
+  "short_window": 4,
+  "long_window": 10,
+  "volume_mavg_Value": 7,
+  "MaRateUp": 1.5,
+  "VolumeSellRate": 5.0,
+  "rsi_period": 7,
+  "rsiValueThd": 34,
+  "rsiRateUp": 1,
+  "divergence_threshold": 0.04
+}
+--------------------
+Rank 23:
+  Sharpe Ratio: 1.25
+  Total Return: 89.68%
+  Max Drawdown: -14.71%
+  Annualized Return: 24.88%
+  Parameters: {
+  "short_window": 4,
+  "long_window": 10,
+  "volume_mavg_Value": 5,
+  "MaRateUp": 1.5,
+  "VolumeSellRate": 4.0,
+  "rsi_period": 11,
+  "rsiValueThd": 32,
+  "rsiRateUp": 1,
+  "divergence_threshold": 0.04
+}
+--------------------
+Rank 24:
+  Sharpe Ratio: 1.25
+  Total Return: 89.68%
+  Max Drawdown: -14.71%
+  Annualized Return: 24.88%
+  Parameters: {
+  "short_window": 4,
+  "long_window": 10,
+  "volume_mavg_Value": 5,
+  "MaRateUp": 1.5,
+  "VolumeSellRate": 5.0,
+  "rsi_period": 11,
+  "rsiValueThd": 32,
+  "rsiRateUp": 1,
+  "divergence_threshold": 0.04
+}
+--------------------
+Rank 25:
+  Sharpe Ratio: 1.28
+  Total Return: 89.55%
+  Max Drawdown: -14.71%
+  Annualized Return: 24.85%
+  Parameters: {
+  "short_window": 4,
+  "long_window": 10,
+  "volume_mavg_Value": 9,
+  "MaRateUp": 1.5,
+  "VolumeSellRate": 3.0,
+  "rsi_period": 11,
+  "rsiValueThd": 34,
+  "rsiRateUp": 1,
+  "divergence_threshold": 0.04
+}
+--------------------
+Rank 26:
+  Sharpe Ratio: 1.19
+  Total Return: 89.48%
+  Max Drawdown: -14.71%
+  Annualized Return: 24.84%
+  Parameters: {
+  "short_window": 4,
+  "long_window": 10,
+  "volume_mavg_Value": 7,
+  "MaRateUp": 1.5,
+  "VolumeSellRate": 5.0,
+  "rsi_period": 11,
+  "rsiValueThd": 34,
+  "rsiRateUp": 1,
+  "divergence_threshold": 0.06
+}
+--------------------
+Rank 27:
+  Sharpe Ratio: 1.20
+  Total Return: 89.45%
+  Max Drawdown: -17.60%
+  Annualized Return: 24.83%
+  Parameters: {
+  "short_window": 3,
+  "long_window": 10,
+  "volume_mavg_Value": 11,
+  "MaRateUp": 1.5,
+  "VolumeSellRate": 3.0,
+  "rsi_period": 7,
+  "rsiValueThd": 34,
+  "rsiRateUp": 1,
+  "divergence_threshold": 0.04
+}
+--------------------
+Rank 28:
+  Sharpe Ratio: 1.16
+  Total Return: 89.35%
+  Max Drawdown: -18.33%
+  Annualized Return: 24.81%
+  Parameters: {
+  "short_window": 3,
+  "long_window": 14,
+  "volume_mavg_Value": 7,
+  "MaRateUp": 1.5,
+  "VolumeSellRate": 5.0,
+  "rsi_period": 9,
+  "rsiValueThd": 34,
+  "rsiRateUp": 1,
+  "divergence_threshold": 0.06
+}
+--------------------
+Rank 29:
+  Sharpe Ratio: 1.26
+  Total Return: 89.33%
+  Max Drawdown: -17.28%
+  Annualized Return: 24.80%
+  Parameters: {
+  "short_window": 4,
+  "long_window": 10,
+  "volume_mavg_Value": 11,
+  "MaRateUp": 1.5,
+  "VolumeSellRate": 3.0,
+  "rsi_period": 9,
+  "rsiValueThd": 34,
+  "rsiRateUp": 1,
+  "divergence_threshold": 0.04
+}
+--------------------
+Rank 30:
+  Sharpe Ratio: 1.28
+  Total Return: 88.92%
+  Max Drawdown: -14.71%
+  Annualized Return: 24.71%
+  Parameters: {
+  "short_window": 4,
+  "long_window": 10,
+  "volume_mavg_Value": 11,
+  "MaRateUp": 1.5,
+  "VolumeSellRate": 3.0,
+  "rsi_period": 11,
+  "rsiValueThd": 34,
+  "rsiRateUp": 1,
+  "divergence_threshold": 0.04
+}
+--------------------
+Rank 31:
+  Sharpe Ratio: 1.20
+  Total Return: 88.88%
+  Max Drawdown: -16.61%
+  Annualized Return: 24.70%
+  Parameters: {
+  "short_window": 3,
+  "long_window": 10,
+  "volume_mavg_Value": 7,
+  "MaRateUp": 1.5,
+  "VolumeSellRate": 5.0,
+  "rsi_period": 9,
+  "rsiValueThd": 34,
+  "rsiRateUp": 1,
+  "divergence_threshold": 0.06
+}
+--------------------
+Rank 32:
+  Sharpe Ratio: 1.13
+  Total Return: 88.74%
+  Max Drawdown: -19.33%
+  Annualized Return: 24.67%
+  Parameters: {
+  "short_window": 3,
+  "long_window": 10,
+  "volume_mavg_Value": 5,
+  "MaRateUp": 1.5,
+  "VolumeSellRate": 4.0,
+  "rsi_period": 9,
+  "rsiValueThd": 34,
+  "rsiRateUp": 1,
+  "divergence_threshold": 0.04
+}
+--------------------
+Rank 33:
+  Sharpe Ratio: 1.13
+  Total Return: 88.74%
+  Max Drawdown: -19.33%
+  Annualized Return: 24.67%
+  Parameters: {
+  "short_window": 3,
+  "long_window": 10,
+  "volume_mavg_Value": 5,
+  "MaRateUp": 1.5,
+  "VolumeSellRate": 5.0,
+  "rsi_period": 9,
+  "rsiValueThd": 34,
+  "rsiRateUp": 1,
+  "divergence_threshold": 0.04
+}
+--------------------
+Rank 34:
+  Sharpe Ratio: 1.19
+  Total Return: 88.71%
+  Max Drawdown: -14.71%
+  Annualized Return: 24.66%
+  Parameters: {
+  "short_window": 3,
+  "long_window": 12,
+  "volume_mavg_Value": 7,
+  "MaRateUp": 1.5,
+  "VolumeSellRate": 5.0,
+  "rsi_period": 7,
+  "rsiValueThd": 34,
+  "rsiRateUp": 1,
+  "divergence_threshold": 0.06
+}
+--------------------
+Rank 35:
+  Sharpe Ratio: 1.19
+  Total Return: 88.64%
+  Max Drawdown: -14.71%
+  Annualized Return: 24.64%
+  Parameters: {
+  "short_window": 4,
+  "long_window": 10,
+  "volume_mavg_Value": 5,
+  "MaRateUp": 1.5,
+  "VolumeSellRate": 4.0,
+  "rsi_period": 11,
+  "rsiValueThd": 34,
+  "rsiRateUp": 1,
+  "divergence_threshold": 0.06
+}
+--------------------
+Rank 36:
+  Sharpe Ratio: 1.19
+  Total Return: 88.64%
+  Max Drawdown: -14.71%
+  Annualized Return: 24.64%
+  Parameters: {
+  "short_window": 4,
+  "long_window": 10,
+  "volume_mavg_Value": 5,
+  "MaRateUp": 1.5,
+  "VolumeSellRate": 5.0,
+  "rsi_period": 11,
+  "rsiValueThd": 34,
+  "rsiRateUp": 1,
+  "divergence_threshold": 0.06
+}
+--------------------
+Rank 37:
+  Sharpe Ratio: 1.21
+  Total Return: 88.45%
+  Max Drawdown: -14.71%
+  Annualized Return: 24.60%
+  Parameters: {
+  "short_window": 3,
+  "long_window": 12,
+  "volume_mavg_Value": 7,
+  "MaRateUp": 1.5,
+  "VolumeSellRate": 5.0,
+  "rsi_period": 11,
+  "rsiValueThd": 34,
+  "rsiRateUp": 1,
+  "divergence_threshold": 0.06
+}
+--------------------
+Rank 38:
+  Sharpe Ratio: 1.22
+  Total Return: 88.32%
+  Max Drawdown: -17.60%
+  Annualized Return: 24.57%
+  Parameters: {
+  "short_window": 3,
+  "long_window": 10,
+  "volume_mavg_Value": 11,
+  "MaRateUp": 1.5,
+  "VolumeSellRate": 3.0,
+  "rsi_period": 9,
+  "rsiValueThd": 34,
+  "rsiRateUp": 1,
+  "divergence_threshold": 0.04
+}
+--------------------
+Rank 39:
+  Sharpe Ratio: 1.30
+  Total Return: 88.29%
+  Max Drawdown: -14.71%
+  Annualized Return: 24.56%
+  Parameters: {
+  "short_window": 4,
+  "long_window": 10,
+  "volume_mavg_Value": 5,
+  "MaRateUp": 1.5,
+  "VolumeSellRate": 4.0,
+  "rsi_period": 13,
+  "rsiValueThd": 28,
+  "rsiRateUp": 1,
+  "divergence_threshold": 0.04
+}
+--------------------
+Rank 40:
+  Sharpe Ratio: 1.30
+  Total Return: 88.29%
+  Max Drawdown: -14.71%
+  Annualized Return: 24.56%
+  Parameters: {
+  "short_window": 4,
+  "long_window": 10,
+  "volume_mavg_Value": 5,
+  "MaRateUp": 1.5,
+  "VolumeSellRate": 5.0,
+  "rsi_period": 13,
+  "rsiValueThd": 28,
+  "rsiRateUp": 1,
+  "divergence_threshold": 0.04
+}
+--------------------
+Rank 41:
+  Sharpe Ratio: 1.21
+  Total Return: 88.28%
+  Max Drawdown: -14.71%
+  Annualized Return: 24.56%
+  Parameters: {
+  "short_window": 4,
+  "long_window": 10,
+  "volume_mavg_Value": 5,
+  "MaRateUp": 1.5,
+  "VolumeSellRate": 4.0,
+  "rsi_period": 7,
+  "rsiValueThd": 30,
+  "rsiRateUp": 1,
+  "divergence_threshold": 0.06
+}
+--------------------
+Rank 42:
+  Sharpe Ratio: 1.21
+  Total Return: 88.28%
+  Max Drawdown: -14.71%
+  Annualized Return: 24.56%
+  Parameters: {
+  "short_window": 4,
+  "long_window": 10,
+  "volume_mavg_Value": 5,
+  "MaRateUp": 1.5,
+  "VolumeSellRate": 5.0,
+  "rsi_period": 7,
+  "rsiValueThd": 30,
+  "rsiRateUp": 1,
+  "divergence_threshold": 0.06
+}
+--------------------
+Rank 43:
+  Sharpe Ratio: 1.19
+  Total Return: 88.01%
+  Max Drawdown: -17.28%
+  Annualized Return: 24.50%
+  Parameters: {
+  "short_window": 4,
+  "long_window": 10,
+  "volume_mavg_Value": 11,
+  "MaRateUp": 1.5,
+  "VolumeSellRate": 4.0,
+  "rsi_period": 7,
+  "rsiValueThd": 34,
+  "rsiRateUp": 1,
+  "divergence_threshold": 0.06
+}
+--------------------
+Rank 44:
+  Sharpe Ratio: 1.19
+  Total Return: 88.01%
+  Max Drawdown: -17.28%
+  Annualized Return: 24.50%
+  Parameters: {
+  "short_window": 4,
+  "long_window": 10,
+  "volume_mavg_Value": 11,
+  "MaRateUp": 1.5,
+  "VolumeSellRate": 5.0,
+  "rsi_period": 7,
+  "rsiValueThd": 34,
+  "rsiRateUp": 1,
+  "divergence_threshold": 0.06
+}
+--------------------
+Rank 45:
+  Sharpe Ratio: 1.14
+  Total Return: 87.88%
+  Max Drawdown: -15.23%
+  Annualized Return: 24.47%
+  Parameters: {
+  "short_window": 3,
+  "long_window": 12,
+  "volume_mavg_Value": 7,
+  "MaRateUp": 1.5,
+  "VolumeSellRate": 5.0,
+  "rsi_period": 7,
+  "rsiValueThd": 34,
+  "rsiRateUp": 1,
+  "divergence_threshold": 0.04
+}
+--------------------
+Rank 46:
+  Sharpe Ratio: 1.14
+  Total Return: 87.57%
+  Max Drawdown: -19.49%
+  Annualized Return: 24.40%
+  Parameters: {
+  "short_window": 5,
+  "long_window": 14,
+  "volume_mavg_Value": 13,
+  "MaRateUp": 1.0,
+  "VolumeSellRate": 4.0,
+  "rsi_period": 7,
+  "rsiValueThd": 34,
+  "rsiRateUp": 1,
+  "divergence_threshold": 0.04
+}
+--------------------
+Rank 47:
+  Sharpe Ratio: 1.16
+  Total Return: 87.56%
+  Max Drawdown: -14.71%
+  Annualized Return: 24.40%
+  Parameters: {
+  "short_window": 3,
+  "long_window": 12,
+  "volume_mavg_Value": 7,
+  "MaRateUp": 1.5,
+  "VolumeSellRate": 5.0,
+  "rsi_period": 11,
+  "rsiValueThd": 34,
+  "rsiRateUp": 1,
+  "divergence_threshold": 0.04
+}
+--------------------
+Rank 48:
+  Sharpe Ratio: 1.25
+  Total Return: 87.51%
+  Max Drawdown: -16.72%
+  Annualized Return: 24.39%
+  Parameters: {
+  "short_window": 4,
+  "long_window": 10,
+  "volume_mavg_Value": 11,
+  "MaRateUp": 1.5,
+  "VolumeSellRate": 3.0,
+  "rsi_period": 7,
+  "rsiValueThd": 32,
+  "rsiRateUp": 1,
+  "divergence_threshold": 0.04
+}
+--------------------
+Rank 49:
+  Sharpe Ratio: 1.27
+  Total Return: 87.41%
+  Max Drawdown: -14.71%
+  Annualized Return: 24.36%
+  Parameters: {
+  "short_window": 4,
+  "long_window": 10,
+  "volume_mavg_Value": 5,
+  "MaRateUp": 1.5,
+  "VolumeSellRate": 4.0,
+  "rsi_period": 11,
+  "rsiValueThd": 28,
+  "rsiRateUp": 1,
+  "divergence_threshold": 0.04
+}
+--------------------
+Rank 50:
+  Sharpe Ratio: 1.27
+  Total Return: 87.41%
+  Max Drawdown: -14.71%
+  Annualized Return: 24.36%
+  Parameters: {
+  "short_window": 4,
+  "long_window": 10,
+  "volume_mavg_Value": 5,
+  "MaRateUp": 1.5,
+  "VolumeSellRate": 5.0,
+  "rsi_period": 11,
+  "rsiValueThd": 28,
+  "rsiRateUp": 1,
+  "divergence_threshold": 0.04
+}
+--------------------

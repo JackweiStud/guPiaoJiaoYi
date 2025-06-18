@@ -1069,6 +1069,16 @@ def testOnlyNew(symbol):
    else:
        print("\n今天无买卖信号")
 
+class NpEncoder(json.JSONEncoder):
+    def default(self, obj):
+        if isinstance(obj, np.integer):
+            return int(obj)
+        elif isinstance(obj, np.floating):
+            return float(obj)
+        elif isinstance(obj, np.ndarray):
+            return obj.tolist()
+        return super(NpEncoder, self).default(obj)
+
 def _find_params_worker(args):
     """
     Worker function for findGoodParam's multiprocessing pool.
@@ -1158,7 +1168,7 @@ def findGoodParam(symbol,
             sys.stdout.write(f'\r{progress}')
             sys.stdout.flush()
     
-    print("\n\n------------f'{symbol}':参数寻优完成！------------")
+    print(f"\n\n------------{symbol}:参数寻优完成！------------")
     
     if not results:
         print("所有参数组合均未产生有效结果。")
@@ -1192,7 +1202,7 @@ def findGoodParam(symbol,
                     f.write(f"  Max Drawdown: {result['max_drawdown']*100:.2f}%\n")
                     f.write(f"  Annualized Return: {result['annualized_return']*100:.2f}%\n")
                                    
-                    f.write(f"  Parameters: {json.dumps(result['params'], indent=2)}\n")
+                    f.write(f"  Parameters: {json.dumps(result['params'], indent=2, cls=NpEncoder)}\n")
                     f.write("-" * 20 + "\n")
             print(f"\nTop 50 results saved to {logFile}")
         except IOError as e:
@@ -1256,13 +1266,13 @@ def ganggu30ETFParaFind():
    symbol = "513160"
    custom_param_grid = {
         'short_window': np.arange(3, 6, 1),            # 从3到8，步长为2
-        'long_window': np.arange(10, 20, 5),           # 从10到30，步长为5
+        'long_window': np.arange(10, 20, 2),           # 从10到30，步长为5
         'volume_mavg_Value': np.arange(5, 15, 2),      # 从5到15，步长为5
         'MaRateUp': np.arange(1, 3, 0.5),          # 从0.5到1.5，步长为0.5
-        'VolumeSellRate': np.arange(1.0, 6.0, 2),    # 从2.0到8.0，步长为2.0
+        'VolumeSellRate': np.arange(1.0, 6.0, 1),    # 从2.0到8.0，步长为2.0
         'rsi_period': np.arange(7, 16, 2),             # 从7到20，步长为3
-        'rsiValueThd': np.arange(26, 38, 3),          # 从10到50，步长为10
-        'rsiRateUp': np.arange(1, 4, 0.5),         # 从0.5到5.0，步长为1.0
+        'rsiValueThd': np.arange(26, 36, 2),          # 从10到50，步长为10
+        'rsiRateUp': np.arange(1, 3, 1),         # 从0.5到5.0，步长为1.0
         'divergence_threshold': np.round(np.arange(0.04, 0.08, 0.02), 2) # 从0.03到0.1，步长为0.02
     }
    
@@ -1311,7 +1321,7 @@ def testAuto(symbol):
         print(f"警告: 无法从 'strategy_params.json' 加载参数 (错误: {e})。将使用代码中定义的默认参数。")
     
     # 策略执行起始时间
-    statTime='2022-01-01'
+    statTime='2024-01-01'
 
     performance_stats = strategyFunc(
             filepath=filepath,
@@ -1331,7 +1341,7 @@ def testAuto(symbol):
             # 设置时间范围，确保包含今天
             statTime = statTime, 
             endTime=get_beijing_time().strftime('%Y-%m-%d'),
-            plot_results=1,  # 需要设置为True以生成图片
+            plot_results=2,  # 需要设置为True以生成图片
             verbose=True,
             enable_file_io=True
         )
@@ -1354,5 +1364,7 @@ if __name__ == "__main__":
 
    #testAuto(symbol = "159915")
    #testAuto(symbol = "588180")
-   ganggu30ETFParaFind()
+   #ganggu30ETFParaFind()
    #testAuto(symbol = "513160") # 港股
+
+   testAuto(symbol = "513160") # 港股
