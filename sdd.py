@@ -11,6 +11,8 @@ import os
 import json
 import time
 from datetime import datetime, timezone, timedelta
+import multiprocessing
+from functools import partial
 
 project_root = os.path.dirname((os.path.abspath(__file__)))
 sys.path.append(project_root)
@@ -81,7 +83,8 @@ def simple_ma_strategy(data, symbol, short_window, long_window,
                          divergence_threshold=0.06,
                          VolumeSellRate=4.5,
                          plot_chart=1,
-                         pic_folder='pic'
+                         pic_folder='pic',
+                         enable_file_io=True
                          ):
     """
     简单均线交叉策略
@@ -97,6 +100,7 @@ def simple_ma_strategy(data, symbol, short_window, long_window,
     :param VolumeSellRate: 成交量卖出倍数
     :param plot_chart: int, 是否绘制K线和信号图 (0:不绘制, 1:仅保存,2: 保存图片并显示图表)
     :param pic_folder: str, 图片和CSV保存的文件夹路径
+    :param enable_file_io: bool, 是否启用文件写入功能 (用于优化)
     :return: Series, 包含信号 (1: 买入, -1: 卖出, 0: 持有)
     """
     signals = pd.DataFrame(index=data.index)
@@ -148,7 +152,8 @@ def simple_ma_strategy(data, symbol, short_window, long_window,
         'rsi_buy_condition': rsi_buy_condition,
         'buy_condition': buy_condition
     })
-    divergence_df.to_csv(os.path.join(pic_folder, f'{symbol}_divergence_ratio.csv'), index=False)
+    if enable_file_io:
+        divergence_df.to_csv(os.path.join(pic_folder, f'{symbol}_divergence_ratio.csv'), index=False)
     
     
     # 卖出条件：死叉、或收盘低于长期均线，另外若收盘价格大于短期均线，暂时不卖出
@@ -168,7 +173,8 @@ def simple_ma_strategy(data, symbol, short_window, long_window,
     signals.loc[signals.index[:short_window], 'signal'] = 0
 
     # 新增功能：将信号保存到CSV文件
-    signals['signal'].to_csv(os.path.join(pic_folder, f'{symbol}_temp_strategy.csv'), header=True)
+    if enable_file_io:
+        signals['signal'].to_csv(os.path.join(pic_folder, f'{symbol}_temp_strategy.csv'), header=True)
     
     # 新增绘图功能
     if plot_chart >= 1:
@@ -319,7 +325,8 @@ def run_backtest(data,symbol,
                  verbose=True,
                  statTime=None, 
                  endTime=None,
-                 pic_folder='pic'
+                 pic_folder='pic',
+                 enable_file_io=True
                 ):
     
     # 根据回测时间范围筛选数据
@@ -438,11 +445,12 @@ def run_backtest(data,symbol,
     # 重命名列以匹配 performance_analyzer 的期望
     portfolio.rename(columns={'total_value': 'total', 'holdings_value': 'holdings'}, inplace=True)
     # 保存投资组合信息到CSV文件
-    portfolio_info = portfolio[['cash', 'shares', 'holdings', 'total', 'returns', 'cumulative_returns','commission_paid']].copy()
-    portfolio_info['returns'] = portfolio_info['returns'].map('{:.2%}'.format)
-    portfolio_info['cumulative_returns'] = portfolio_info['cumulative_returns'].map('{:.2%}'.format)
-    portfolio_info.index.name = 'DateTime'
-    portfolio_info.to_csv(os.path.join(pic_folder, f'{symbol}_BuyAndSell.csv'), float_format='%.2f')
+    if enable_file_io:
+        portfolio_info = portfolio[['cash', 'shares', 'holdings', 'total', 'returns', 'cumulative_returns','commission_paid']].copy()
+        portfolio_info['returns'] = portfolio_info['returns'].map('{:.2%}'.format)
+        portfolio_info['cumulative_returns'] = portfolio_info['cumulative_returns'].map('{:.2%}'.format)
+        portfolio_info.index.name = 'DateTime'
+        portfolio_info.to_csv(os.path.join(pic_folder, f'{symbol}_BuyAndSell.csv'), float_format='%.2f')
     return portfolio
 
 
@@ -742,7 +750,8 @@ from performance_analyzer import calculate_performance, plot_performance
 :param plot_results: int, 控制绘图和保存。0:不绘制不保存, 1:仅保存图片, 2:保存并显示图片
 :param verbose: bool, 是否打印详细日志
 """
-def strategyFunc(filepath, 
+def strategyFunc(filepath=None, 
+             data=None,
              symbol=None,
              short_window=5, 
              long_window=16,
@@ -760,21 +769,30 @@ def strategyFunc(filepath,
              divergence_threshold=0.06,
              VolumeSellRate=4.5,
              statTime=None, endTime=None,
-             plot_results=2, verbose=True):
+             plot_results=2, verbose=True,
+             enable_file_io=True):
 
         # 从filepath推断出根目录和pic目录
         # filepath is like '.../stock_data/588180/588180_Day.csv'
         # We want '.../pic'
-        stock_data_folder = os.path.dirname(os.path.dirname(filepath)) # .../stock_data
-        project_root_folder = os.path.dirname(stock_data_folder) # .../
-        pic_folder = os.path.join(project_root_folder, 'pic')
+        if filepath:
+            stock_data_folder = os.path.dirname(os.path.dirname(filepath)) # .../stock_data
+            project_root_folder = os.path.dirname(stock_data_folder) # .../
+            pic_folder = os.path.join(project_root_folder, 'pic')
+        else:
+            pic_folder = os.path.join(project_root, 'pic')
 
         # 确保pic文件夹存在
         os.makedirs(pic_folder, exist_ok=True)
         #print(f"图片和CSV将保存到: {pic_folder}")
 
         # 1. 加载数据
-        etf_data = load_etf_data(filepath)
+        if data is not None:
+            etf_data = data
+        elif filepath:
+            etf_data = load_etf_data(filepath)
+        else:
+            raise ValueError("Either 'filepath' or 'data' must be provided to strategyFunc.")
         
         if verbose:
             print("数据加载成功:")
@@ -792,6 +810,7 @@ def strategyFunc(filepath,
                                      VolumeSellRate=VolumeSellRate,
                                      plot_chart=plot_results,
                                      pic_folder=pic_folder,
+                                     enable_file_io=enable_file_io
                                      )
 
         # 3. 执行回测
@@ -807,7 +826,8 @@ def strategyFunc(filepath,
             verbose=verbose,
             statTime=statTime,
             endTime=endTime,
-            pic_folder=pic_folder
+            pic_folder=pic_folder,
+            enable_file_io=enable_file_io
         )
 
         # 4. 计算并展示绩效
@@ -884,7 +904,8 @@ def testOnlyOk(symbol):
             statTime='2023-1-01',
             endTime='2025-9-20',
             plot_results=2,
-            verbose=True)
+            verbose=True,
+            enable_file_io=True)
 
 
 def testOnly1(symbol = "588180"):
@@ -956,7 +977,8 @@ def testOnly1(symbol = "588180"):
             statTime='2022-1-01',
             endTime='2025-9-20',
             plot_results=0,
-            verbose=True)
+            verbose=True,
+            enable_file_io=True)
 
 def testOnlyNew(symbol):
     #filepath="D:\\Code\\Ai\\jinrongTest\\github\\stock_data\\561560_Day.csv"
@@ -1015,7 +1037,8 @@ def testOnlyNew(symbol):
         statTime='2025-1-1',
         endTime='2025-9-20',
         plot_results=2, 
-        verbose=False)
+        verbose=False,
+        enable_file_io=True)
 
     # 获取回测结果的 portfolio DataFrame
    portfolio_df = performance_stats.get('portfolio_df')
@@ -1046,13 +1069,53 @@ def testOnlyNew(symbol):
    else:
        print("\n今天无买卖信号")
 
+def _find_params_worker(args):
+    """
+    Worker function for findGoodParam's multiprocessing pool.
+    Runs a single backtest with a given set of parameters.
+    Unpacks arguments for multiprocessing.
+    """
+    params, etf_data, symbol, statTime, endTime = args
+    try:
+        performance_stats = strategyFunc(
+            data=etf_data, # 直接传递数据
+            symbol=symbol,
+            **params,
+            initial_capital=10000.0,
+            commission=0.0003,
+            max_portfolio_allocation_pct=1,
+            buy_increment_pct_of_initial_capital=1,
+            sell_decrement_pct_of_current_shares=1,
+            min_shares_per_trade=100,
+            statTime=statTime,
+            endTime=endTime,
+            plot_results=0,  # Disable plotting for optimization
+            verbose=False,   # Disable verbose logging for optimization
+            enable_file_io=False # 禁用文件写入
+        )
+
+        return {
+            'params': params,
+            'total_return': performance_stats['total_return'],
+            'annualized_return': performance_stats['annualized_return'],
+            'sharpe_ratio': performance_stats['sharpe_ratio'],
+            'max_drawdown': performance_stats['max_drawdown']
+        }
+    except Exception as e:
+        # Optional: Log the error. For now, just returning None is fine.
+        # print(f"\nError with params {params}: {e}")
+        return None
+
 def findGoodParam(symbol, 
                 param_grid=None, 
                 statTime='2021-1-30',
                 endTime='2025-3-10'):
     #filepath="D:\\Code\\Ai\\jinrongTest\\github\\stock_data\\588180_Day.csv" # 科创50
     filepath = os.path.join(project_root, 'stock_data', f'{symbol}', f'{symbol}_Day.csv')
-    print(filepath) 
+    print(f"Loading data from: {filepath}") 
+    # 1. 一次性加载数据
+    etf_data = load_etf_data(filepath)
+    print("Data loaded successfully.")
 
     stock_data_folder = os.path.dirname(filepath) # .../stock_data/symbol
     print(stock_data_folder) 
@@ -1061,59 +1124,50 @@ def findGoodParam(symbol,
     keys, values = zip(*param_grid.items())
     param_combinations = [dict(zip(keys, v)) for v in itertools.product(*values)]
 
-    top_results = []
+    # 预先筛选无效的组合
+    valid_combinations = [p for p in param_combinations if p.get('long_window', 0) > p.get('short_window', 0)]
     
-    total_combinations = len(param_combinations)
-    print(f"开始寻找最优参数，共 {total_combinations} 种组合...")
+    total_combinations = len(valid_combinations)
+    if total_combinations == 0:
+        print("没有有效的参数组合。")
+        return
 
-    for i, params in enumerate(param_combinations):
-        # 确保长窗口大于短窗口
-        if params['long_window'] <= params['short_window']:
-            continue
+    print(f"开始寻找最优参数，共 {total_combinations} 种有效组合...")
+
+    # 使用所有可用的CPU核心
+    num_processes = multiprocessing.cpu_count()
+    print(f"使用 {num_processes} 个进程进行并行计算...")
+    
+    # 2. 准备要传递给工作进程的参数
+    # 将共享的参数与每个变化的参数组合打包
+    tasks = [(p, etf_data, symbol, statTime, endTime) for p in valid_combinations]
+
+    results = []
+    # 使用多进程池并行执行回测
+    with multiprocessing.Pool(processes=num_processes) as pool:
+        # 使用functools.partial来创建一个带有固定参数的新函数
+        # task = partial(_find_params_worker, etf_data=etf_data, symbol=symbol, statTime=statTime, endTime=endTime)
         
-        # 打印进度
-        progress = f"正在测试第 {i+1}/{total_combinations} 种参数组合"
-        sys.stdout.write(f'\r{progress}')
-        sys.stdout.flush()
-
-        try:
-            performance_stats = strategyFunc(
-                filepath,
-                symbol=symbol,
-                **params, # 使用解包传递参数
-                initial_capital=10000.0,
-                commission=0.0003,
-                max_portfolio_allocation_pct=1,
-                buy_increment_pct_of_initial_capital=1,
-                sell_decrement_pct_of_current_shares=1,
-                min_shares_per_trade=100,
-                statTime=statTime,
-                endTime=endTime,
-                plot_results=0, # 优化时禁用绘图
-                verbose=False      # 优化时禁用日志
-            )
-
-            current_result = {
-                'params': params,
-                'total_return': performance_stats['total_return'],
-                'annualized_return': performance_stats['annualized_return'],
-                'sharpe_ratio': performance_stats['sharpe_ratio'],
-                'max_drawdown': performance_stats['max_drawdown']
-            }
+        # imap_unordered可以让我们在任务完成时立即获得结果，便于展示进度
+        for i, result in enumerate(pool.imap_unordered(_find_params_worker, tasks), 1):
+            if result:
+                results.append(result)
             
-            top_results.append(current_result)
-            # 代码含义：对 top_results 列表进行排序，排序优先级为：年化收益率（annualized_return）优先，其次是夏普比率（sharpe_ratio），最后是最大回撤（max_drawdown）。reverse=True 表示从高到低排序（即年化收益率越高越靠前，夏普比率越高越靠前，最大回撤越大越靠前——注意这里如果想回撤小更优，应该是越小越靠前，通常需要取负数或不reverse）。
-            #top_results.sort(key=lambda x: (x['annualized_return'], x['sharpe_ratio'], x['max_drawdown']), reverse=True)
-            top_results.sort(key=lambda x: ( x['total_return'], x['sharpe_ratio'], x['max_drawdown']), reverse=True)
-            
-            if len(top_results) > 10:
-                top_results = top_results[:10]
-
-        except Exception as e:
-            # 打印错误信息但继续执行
-            print(f"\n参数 {params} 执行出错: {e}")
+            # 在控制台更新进度
+            progress = f"进度: {i}/{total_combinations} ({(i / total_combinations) * 100:.1f}%)"
+            sys.stdout.write(f'\r{progress}')
+            sys.stdout.flush()
     
     print("\n\n------------f'{symbol}':参数寻优完成！------------")
+    
+    if not results:
+        print("所有参数组合均未产生有效结果。")
+        return
+
+    # 对结果进行排序
+    results.sort(key=lambda x: (x['total_return'], x['sharpe_ratio'], x['max_drawdown']), reverse=True)
+    top_results = results[:50]
+
     print("------------------------------------")
     if top_results:
         best_result = top_results[0]
@@ -1128,8 +1182,8 @@ def findGoodParam(symbol,
             
             logFile = os.path.join(stock_data_folder, f'{symbol}_FindReturn.log')
             with open(logFile, 'w', encoding='utf-8') as f:
-                f.write(f"Top 10 Parameter Combinations for {logFile}\n")
-                f.write("Ranked by Annualized Return, then Sharpe Ratio, then Max Drawdown\n")
+                f.write(f"Top 50 Parameter Combinations for {symbol}\n")
+                f.write("Ranked by Total Return, then Sharpe Ratio, then Max Drawdown\n")
                 f.write("="*50 + "\n")
                 for i, result in enumerate(top_results):
                     f.write(f"Rank {i+1}:\n")
@@ -1138,11 +1192,11 @@ def findGoodParam(symbol,
                     f.write(f"  Max Drawdown: {result['max_drawdown']*100:.2f}%\n")
                     f.write(f"  Annualized Return: {result['annualized_return']*100:.2f}%\n")
                                    
-                    f.write(f"  Parameters: {result['params']}\n")
+                    f.write(f"  Parameters: {json.dumps(result['params'], indent=2)}\n")
                     f.write("-" * 20 + "\n")
-            print("\nTop 10 results saved to FindReturn.log")
+            print(f"\nTop 50 results saved to {logFile}")
         except IOError as e:
-            print(f"\nError writing to file FindReturn.log: {e}")
+            print(f"\nError writing to file {logFile}: {e}")
     else:
         print("没有找到有效的参数组合。")
 
@@ -1196,6 +1250,29 @@ def kechuang50ETFParaFind():
        endTime = '2024-9-20'
    )
 
+
+def ganggu30ETFParaFind():   
+
+   symbol = "513160"
+   custom_param_grid = {
+        'short_window': np.arange(3, 6, 1),            # 从3到8，步长为2
+        'long_window': np.arange(10, 20, 5),           # 从10到30，步长为5
+        'volume_mavg_Value': np.arange(5, 15, 2),      # 从5到15，步长为5
+        'MaRateUp': np.arange(1, 3, 0.5),          # 从0.5到1.5，步长为0.5
+        'VolumeSellRate': np.arange(1.0, 6.0, 2),    # 从2.0到8.0，步长为2.0
+        'rsi_period': np.arange(7, 16, 2),             # 从7到20，步长为3
+        'rsiValueThd': np.arange(26, 38, 3),          # 从10到50，步长为10
+        'rsiRateUp': np.arange(1, 4, 0.5),         # 从0.5到5.0，步长为1.0
+        'divergence_threshold': np.round(np.arange(0.04, 0.08, 0.02), 2) # 从0.03到0.1，步长为0.02
+    }
+   
+   # 使用自定义参数网格和时间范围调用findGoodParam2
+   findGoodParam(
+       symbol = symbol,
+       param_grid = custom_param_grid,
+       statTime = '2022-03-10',
+       endTime = '2025-03-10'
+   )
 def testAuto(symbol):
 
     filepath = os.path.join(project_root, 'stock_data',  f'{symbol}', f'{symbol}_Day.csv')
@@ -1255,7 +1332,8 @@ def testAuto(symbol):
             statTime = statTime, 
             endTime=get_beijing_time().strftime('%Y-%m-%d'),
             plot_results=1,  # 需要设置为True以生成图片
-            verbose=True
+            verbose=True,
+            enable_file_io=True
         )
     
 
@@ -1276,4 +1354,5 @@ if __name__ == "__main__":
 
    #testAuto(symbol = "159915")
    #testAuto(symbol = "588180")
-   testAuto(symbol = "513160") # 港股
+   ganggu30ETFParaFind()
+   #testAuto(symbol = "513160") # 港股

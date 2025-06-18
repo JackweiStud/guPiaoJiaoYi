@@ -117,7 +117,8 @@ def get_trading_signal(stock_code):
             statTime = statTime, 
             endTime=get_beijing_time().strftime('%Y-%m-%d'),
             plot_results=1,  # 需要设置为True以生成图片
-            verbose=False
+            verbose=False,
+            enable_file_io=True
         )
 
         portfolio_df = performance_stats.get('portfolio_df')
