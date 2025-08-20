@@ -48,7 +48,7 @@ if __name__ == "__main__":
     ETFTest("518880.SH") ##黄金
     ETFTest("159915.SH") ##创业
     ETFTest("513160.SH") #港股科技
-
+    ETFTest("511090.SH") #国债
 
 
 
