@@ -38,8 +38,8 @@
     "159915": {
         "short_window": 5,
         "long_window": 13,
-        "volume_mavg_Value": 10,
-        "MaRateUp": 1.5,
+        "volume_mavg_Value": 7,
+        "MaRateUp": 1.4,
         "VolumeSellRate": 3.0,
         "rsi_period": 13,
         "rsiValueThd": 27,
@@ -56,5 +56,16 @@
         "rsiValueThd": 25,
         "rsiRateUp": 1,
         "divergence_threshold": 0.065
-      }
+    } ,
+    "159843": {
+        "short_window": 3,
+        "long_window": 12, 
+        "volume_mavg_Value": 10,
+        "MaRateUp": 1.8,
+        "VolumeSellRate": 2.0,
+        "rsi_period": 7,
+        "rsiValueThd": 24,
+        "rsiRateUp": 2.5,
+        "divergence_threshold": 0.037
+    }
 }

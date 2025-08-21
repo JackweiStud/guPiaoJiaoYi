@@ -1283,6 +1283,33 @@ def ganggu30ETFParaFind():
        statTime = '2022-03-10',
        endTime = '2025-03-10'
    )
+
+
+def gangguxiaofeiETFParaFind():   
+
+   symbol = "159843"
+   custom_param_grid = {
+        'short_window': np.arange(3, 6, 1),            # 从3到8，步长为2
+        'long_window': np.arange(10, 20, 2),           # 从10到30，步长为5
+        'volume_mavg_Value': np.arange(5, 15, 2),      # 从5到15，步长为5
+        'MaRateUp': np.arange(1, 3, 0.5),          # 从0.5到1.5，步长为0.5
+        'VolumeSellRate': np.arange(1.0, 6.0, 1),    # 从2.0到8.0，步长为2.0
+        'rsi_period': np.arange(7, 16, 2),             # 从7到20，步长为3
+        'rsiValueThd': np.arange(25, 35, 2),          # 从10到50，步长为10
+        'rsiRateUp': np.arange(1, 3, 1),         # 从0.5到5.0，步长为1.0
+        'divergence_threshold': np.round(np.arange(0.03, 0.09, 0.02), 2) # 从0.03到0.1，步长为0.02
+    }
+   
+   # 使用自定义参数网格和时间范围调用findGoodParam2
+   findGoodParam(
+       symbol = symbol,
+       param_grid = custom_param_grid,
+       statTime = '2021-03-10',
+       endTime = '2025-03-10'
+   )
+
+
+
 def testAuto(symbol):
 
     filepath = os.path.join(project_root, 'stock_data',  f'{symbol}', f'{symbol}_Day.csv')
@@ -1367,4 +1394,7 @@ if __name__ == "__main__":
    #ganggu30ETFParaFind()
    #testAuto(symbol = "513160") # 港股
 
-   testAuto(symbol = "513160") # 港股
+   #testAuto(symbol = "513160") # 港股
+
+   #gangguxiaofeiETFParaFind()
+   testAuto(symbol = "159843") # 消费

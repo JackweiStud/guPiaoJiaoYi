@@ -257,3 +257,4 @@ if __name__ == "__main__":
     autoProcessETF("588180.SH") #科创50
     autoProcessETF("159915.SH") ##创业
     autoProcessETF("513160.SH") ##ganggu30
+    autoProcessETF("159843.SH") ##消费
