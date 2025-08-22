@@ -46,13 +46,12 @@ SMTP_CONFIGS = {
         "port": 587,
         "description": "微软 Outlook 邮箱"
     },
-    # 可以在这里继续添加其他服务商，例如：
-    # "qq": {
-    #     "server": "smtp.qq.com",
-    #     "port": 465, # 或者 587，取决于QQ邮箱的设置
-    #     "use_ssl": True, # QQ邮箱可能需要SSL
-    #     "description": "腾讯QQ邮箱 (需要使用授权码)"
-    # }
+    "qq": {
+        "server": "smtp.qq.com",
+        "port": 465,  # QQ邮箱推荐使用465端口，SSL加密
+        "use_ssl": True,  # QQ邮箱必须使用SSL
+        "description": "腾讯QQ邮箱 (需要使用授权码，非QQ密码)"
+    }
 }
 
 # ========================================================================
@@ -64,12 +63,19 @@ SMTP_CONFIGS = {
 
 # --- 选择你要使用的发件服务商 ---
 # 从上面 SMTP_CONFIGS 中选择一个，例如 "gmail" 或 "outlook"
-ACTIVE_SMTP_PROVIDER = "gmail"
+ACTIVE_SMTP_PROVIDER1 = "gmail"
+ACTIVE_SMTP_PROVIDER = "qq"
 
 # --- 填写该服务商对应的邮箱和密码/授权码 ---
 SENDER_CREDENTIALS = {
-    "email": "jackwlianmu@gmail.com",       # 你的发件邮箱地址
-    "password": "ewduvpnmffmnkuqe"          # 双认证后===你的邮箱密码或应用专用密码/授权码
+    "email": ",       # 你的发件邮箱地址
+    "password": ""          # 双认证后===你的邮箱密码或应用专用密码/授权码
+}
+
+
+SENDER_CREDENTIALS1 = {
+    "email": "",       # 你的发件邮箱地址
+    "password": ""          # 双认证后===你的邮箱密码或应用专用密码/授权码
 }
 
 # ========================================================================
@@ -79,7 +85,7 @@ SENDER_CREDENTIALS = {
 # 实际使用中，这些信息通常由程序的业务逻辑动态提供。
 DEFAULT_RECIPIENTS = {
     "to": ["wzq1314192567@gmail.com"],
-    "cc": ["wzq1314192567@outlook.com","550661468@qq.com"]
+    "cc": ["wzq1314192567@outlook.com",""]
 }
 
 # ========================================================================

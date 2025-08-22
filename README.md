@@ -42,3 +42,6 @@ certifi：pip install --upgrade certifi
 
 #powershell -- 国内可以不开VPN
 Test-NetConnection -ComputerName smtp.gmail.com -Port 465
+
+
+autoProcess.py 使用国内网络，不需要VPN ，邮箱已改为QQ，AI--deepseek 股票为国内  --全部为国内环境

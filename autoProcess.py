@@ -16,6 +16,7 @@ from main import ETFTest
 from sdd import strategyFunc
 from mailFun import EmailSender
 from mailFun import config as email_config
+from deepSeekAi import aiDeepSeekAnly
 
 def get_beijing_time():
     """返回当前的北京时间 (UTC+8)"""
@@ -46,9 +47,23 @@ def run_trading_strategy(stock_code):
     _, signal_text = get_trading_signal(stock_code)
     print(f"分析完成。{stock_code} 的今日信号: {signal_text}")
 
-    # 3. 根据交易信号发送邮件
+    #3 新增股票分析功能 调用 aiDeepSeekAnly("588180") 
+    symbol = f"{stock_code.split('.')[0]}"
+    print(f"----AI开始获取{symbol}数据，并智能分析---------） ")
+    aiResultInfo = aiDeepSeekAnly(symbol)
+    
+    # 根据AI分析结果拼接signal_text
+    aiDataInfo = ""
+    if aiResultInfo and aiResultInfo.strip():
+        aiDataInfo = aiResultInfo
+        print(f"AI分析结果长度: {len(aiDataInfo)}")
+    else:
+        aiDataInfo =  "aiResultInfo not ok"
+        print("AI分析结果为空，已添加默认提示信息")
+
+    # 4. 根据交易信号发送邮件
     print("\n[步骤 3/3] 正在准备发送邮件通知...")
-    notify_by_email(stock_code, signal_text)
+    notify_by_email(stock_code, signal_text, aiDataInfo)
 
     print("\n" + "="*50)
     print("自动化流程执行完毕。")
@@ -152,7 +167,7 @@ def get_trading_signal(stock_code):
         print(traceback.format_exc())
         return "error", "策略执行出错"
 
-def notify_by_email(stock_code, signal_text):
+def notify_by_email(stock_code, signal_text, aiDataInfo = None):
     """
     根据信号发送邮件，增加5次重试逻辑。
     """
@@ -165,6 +180,9 @@ def notify_by_email(stock_code, signal_text):
             标的: {stock_code}
             时间: {get_beijing_time().strftime('%Y-%m-%d %H:%M:%S')}
             交易信号: {signal_text}
+
+            详细AI趋势分析：
+            {aiDataInfo}
 
             请查看附件图片获取详细图表。
 
