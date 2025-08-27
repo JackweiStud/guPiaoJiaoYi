@@ -16,7 +16,7 @@ from main import ETFTest
 from sdd import strategyFunc
 from mailFun import EmailSender
 from mailFun import config as email_config
-from deepSeekAi import aiDeepSeekAnly
+from deepSeekAi import aiDeepSeekAnly, extract_position_strategy
 
 def get_beijing_time():
     """返回当前的北京时间 (UTC+8)"""
@@ -54,16 +54,18 @@ def run_trading_strategy(stock_code):
     
     # 根据AI分析结果拼接signal_text
     aiDataInfo = ""
+    strategyinfo = ""
     if aiResultInfo and aiResultInfo.strip():
         aiDataInfo = aiResultInfo
         print(f"AI分析结果长度: {len(aiDataInfo)}")
+        strategyinfo = extract_position_strategy(aiDataInfo)
     else:
         aiDataInfo =  "aiResultInfo not ok"
         print("AI分析结果为空，已添加默认提示信息")
 
     # 4. 根据交易信号发送邮件
     print("\n[步骤 3/3] 正在准备发送邮件通知...")
-    notify_by_email(stock_code, signal_text, aiDataInfo)
+    notify_by_email(stock_code, signal_text, aiDataInfo, strategyinfo)
 
     print("\n" + "="*50)
     print("自动化流程执行完毕。")
@@ -167,7 +169,7 @@ def get_trading_signal(stock_code):
         print(traceback.format_exc())
         return "error", "策略执行出错"
 
-def notify_by_email(stock_code, signal_text, aiDataInfo = None):
+def notify_by_email(stock_code, signal_text, aiDataInfo = None, strategyinfo = None):
     """
     根据信号发送邮件，增加5次重试逻辑。
     """
@@ -181,7 +183,10 @@ def notify_by_email(stock_code, signal_text, aiDataInfo = None):
             时间: {get_beijing_time().strftime('%Y-%m-%d %H:%M:%S')}
             交易信号: {signal_text}
 
-            详细AI趋势分析：
+            AI趋势策略：\n
+            {strategyinfo}
+
+            详细AI趋势分析：\n
             {aiDataInfo}
 
             请查看附件图片获取详细图表。
@@ -272,7 +277,12 @@ def autoProcessETF(target_stock_code):
     run_trading_strategy(target_stock_code)
 
 if __name__ == "__main__":
-    autoProcessETF("588180.SH") #科创50
-    autoProcessETF("159915.SH") ##创业
+
+    
+    autoProcessETF("511090.SH") ##国债
+    autoProcessETF("161128.SH") ##每股
     autoProcessETF("513160.SH") ##ganggu30
     autoProcessETF("159843.SH") ##消费
+    autoProcessETF("588180.SH") #科创50
+    autoProcessETF("159915.SH") ##创业
+

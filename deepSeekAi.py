@@ -21,7 +21,7 @@ class DeepSeekConfig(BaseModel):
     api_key: str = Field(..., description="API密钥")
     base_url: str = "https://api.siliconflow.cn/v1"
     system_prompt: str = "你是一位专业的、严谨的量化分析师,必须根据数据客观分析市场，成功率80%，短线之王，言辞犀利，语言精简, 根据用户提供的行情数据给出核心分析和2~5天的建议,默认成功率大于66%"
-    model: str = Field("deepseek-ai/DeepSeek-R1", description="官方指定模型名称R1")  # 修正模型名称
+    model: str = Field("deepseek-ai/DeepSeek-V3.1", description="官方指定模型名称R1")  # 修正模型名称deepseek-ai/DeepSeek-V3.1  deepseek-ai/DeepSeek-R1
     max_tokens: int = 1024*160  # 与官方示例一致
     temperature: float = 0
     top_p: float = 0
@@ -58,9 +58,26 @@ class ETFDataLoader:
 class DeepSeekAnalyzer:
     def __init__(self, config: DeepSeekConfig):
         self.config = config
-        self.client = httpx.Client(timeout=2400, verify=False)  # 总超时120秒
+        # 优化超时设置：分层超时策略
+        self.client = httpx.Client(
+            timeout=httpx.Timeout(
+                connect=10.0,      # 连接超时：10秒
+                read=400.0,        # 读取超时：300秒
+                write=30.0,        # 写入超时：30秒
+                pool=60.0          # 连接池超时：60秒
+            ),
+            verify=False,
+            limits=httpx.Limits(
+                max_keepalive_connections=5,
+                max_connections=10
+            )
+        )
 
-    @retry(stop=stop_after_attempt(1), wait=wait_exponential(multiplier=1, min=4, max=10))
+    @retry(
+        stop=stop_after_attempt(2),  # 增加到3次重试
+        wait=wait_exponential(multiplier=2, min=4, max=30),  # 指数退避：4-30秒
+        reraise=True
+    )
     def analyze_data(self, df: pd.DataFrame, user_prompt: str) -> Dict[str, str]:
         """
         同步版本的数据分析方法
@@ -74,6 +91,7 @@ class DeepSeekAnalyzer:
             #print("user_prompt:" + f"{user_prompt}\n")
 
             print("------------process_response 开始--------------------")
+            print(f"开始调用DeepSeek API，超时设置：连接10s，读取300s")
 
             response = self.client.post(
                 f"{self.config.base_url}/chat/completions",
@@ -90,28 +108,38 @@ class DeepSeekAnalyzer:
                     "top_p": self.config.top_p,
                     "stream": False,
                     "response_format": {"type": "text"},
-                    "stop": ["</分析结束>"]  # 添加停止标记
-                },
-                timeout=1000  # 适当延长超时时间
+                    "stop": ["</分析结束>"]
+                }
+                # 移除timeout参数，使用httpx.Timeout配置
             )
             response.raise_for_status()
 
             response_data = response.json()
+            print("API调用成功，开始处理响应...")
 
             temp = self._process_response(response_data)
-            #print("------------_process_response 完成--------------------")
+            print("------------_process_response 完成--------------------")
             #print(temp)
 
             return temp
 
-
-
+        except httpx.ConnectTimeout:
+            print("连接超时：无法连接到DeepSeek API服务器")
+            return {"content": "连接超时：无法连接到API服务器，请检查网络连接", "reasoning_content": "网络连接问题", "is_complete": False}
+        except httpx.ReadTimeout:
+            print("读取超时：API响应时间过长")
+            return {"content": "读取超时：API响应时间过长，建议简化请求内容", "reasoning_content": "响应超时", "is_complete": False}
         except httpx.HTTPStatusError as e:
-            return {"content": f"API请求失败: {e.response.status_code} {e.response.text}", "reasoning_content": "无推理内容", "is_complete": False}
+            print(f"HTTP状态错误：{e.response.status_code} - {e.response.text}")
+            return {"content": f"API请求失败: {e.response.status_code} {e.response.text}", "reasoning_content": "HTTP错误", "is_complete": False}
+        except httpx.RequestError as e:
+            print(f"请求错误：{str(e)}")
+            return {"content": f"网络请求错误: {str(e)}", "reasoning_content": "网络问题", "is_complete": False}
         except Exception as e:
-            return {"content": f"分析失败: {str(e)}", "reasoning_content": "无推理内容", "is_complete": False}
+            print(f"未知错误：{str(e)}")
+            return {"content": f"分析失败: {str(e)}", "reasoning_content": "系统错误", "is_complete": False}
         finally:
-            self.client.close()  # 同步关闭客户端
+            self.client.close()
 
     def _process_response(self, response_data: dict) -> dict:
         """改进响应处理"""
@@ -173,30 +201,56 @@ def extract_analysis_report(content: str) -> str:
         # 没有结束标签，提取从开始标签到结尾
         return content[start_pos:].strip()
 
+
+def extract_position_strategy(content: str) -> str:
+    """
+    从返回内容中提取持仓策略部分
+    提取从 "**持仓策略（目前100%仓位）**" 到结尾的内容
+    如果没有找到开始标记，则返回空字符串
+    """
+    if not content:
+        return ""
+    
+    # 查找开始标记
+    start_marker = "**持仓策略（目前100%仓位）**"
+    
+    start_idx = content.find(start_marker)
+    if start_idx == -1:
+        return ""  # 没有找到开始标记，返回空字符串
+    
+    # 从开始标记后开始提取到结尾
+    start_pos = start_idx + len(start_marker)
+    
+    # 提取从开始标记到结尾的内容
+    return content[start_pos:].strip()
+
 def aiDeepSeekAnly(code):
    
     # 1. 配置参数
     config = DeepSeekConfig(
-        api_key="sk-fneubbctzdpikdxrbvqjljcjwgfupswkdjwumioyhxdzusdh",
+        api_key="",
         system_prompt="你是一位严谨的ETF量化分析师和交易员,根据用户提供的行情数据给出核心分析和2~5天的建议,默认成功率大于66%，言辞犀利，语言精简"
     )
 
     # 2. 加载数据
     loader = ETFDataLoader()
-    #dataPath = "D:/code-touzi/gitHub/guPiaoJiaoYi/stock_data/588180/588180_Day.csv"
-    #dataPath = "/content/guPiaoJiaoYi/stock_data/588180/588180_Day.csv"
-    #D:\code-touzi\gitHub\guPiaoJiaoYi\stock_data
     dataPath = f"D:/code-touzi/gitHub/guPiaoJiaoYi/stock_data/{code}/{code}_Day.csv"
-    #dataPath = f"/content/guPia
-    # oJiaoYi/stock_data/{code}/{code}_60.csv"
-    #print(dataPath)
-    df = loader.load_etf_data(file_path=dataPath)
+    
+    try:
+        print(f"开始加载{code}数据文件：{dataPath}")
+        df = loader.load_etf_data(file_path=dataPath)
+        print(f"数据加载成功，共{len(df)}条记录")
+    except FileNotFoundError:
+        print(f"错误：找不到数据文件 {dataPath}")
+        return ""
+    except Exception as e:
+        print(f"数据加载失败：{str(e)}")
+        return ""
 
     # 3. 创建分析器
     analyzer = DeepSeekAnalyzer(config)
 
     # 4. 执行分析
-
     data_sample = df.tail(80)
     data_str = data_sample.to_markdown()
     data_summary = f"数据时间范围：{df['DateTime'].min()} 至 {df['DateTime'].max()}"
@@ -321,31 +375,62 @@ def aiDeepSeekAnly(code):
 
     import time
     start_time = time.time()
-    result = analyzer.analyze_data(df, user_prompt)
-    #end_time = time.time()
+    
+    print(f"开始调用DeepSeek API分析{code}...")
+    print(f"超时配置：连接10s，读取300s，总超时320s")
+    
+    try:
+        result = analyzer.analyze_data(df, user_prompt)
+        
+        if result['is_complete']:
+            end_time = time.time()
+            elapsed_time = end_time - start_time
+            
+            print(f"DeepSeek API调用成功！")
+            print(f"⏱总耗时：{elapsed_time:.2f}秒")
+            
+            if 'usage' in result and result['usage']:
+                print(f"Token消耗：输入{result['usage'].get('prompt_tokens', 'N/A')}，输出{result['usage'].get('completion_tokens', 'N/A')}")
+                total_tokens = result['usage'].get('total_tokens', 0)
+                if total_tokens > 8000:
+                    print("警告：接近token上限，建议简化请求")
+            else:
+                print("警告：未获取到Token使用信息")
 
-    # 打印内容和推理内容
-    # 在main函数中添加：
-    if result['is_complete']:
+            print("--------------分析结果-------------------------")
+            analysis_report = extract_analysis_report(result["content"])
+            
+            if analysis_report:
+                print(f"{code}分析完成，已提取分析报告")
+                print(analysis_report)
+                return analysis_report
+            else:
+                print(f"{code}分析完成，但未提取到有效报告")
+                print(result["content"])
+                return result["content"]
+        else:
+            print(f"{code}分析结果不完整")
+            print(f"原因：{result.get('reasoning_content', '未知')}")
+            
+            # 打印不完整result的详细信息
+            print("不完整Result详情:")
+            if isinstance(result, dict):
+                for key, value in result.items():
+                    if key == 'content':
+                        print(f"{key}: {str(value)[:100]}{'...' if len(str(value)) > 100 else ''}")
+                    else:
+                        print(f"{key}: {value}")
+            else:
+                print(f"  Result: {result}")
+            
+            return ""
+            
+    except Exception as e:
         end_time = time.time()
-        print(f"deepseek api耗时：{end_time - start_time:.2f}s")
-
-        print(f"Token消耗：输入{result['usage']['prompt_tokens']}，输出{result['usage']['completion_tokens']}")
-        if result['usage']['total_tokens'] > 4000:
-            print("警告：接近token上限，建议简化请求")
-
-
-        #print("--------------推理内容-------------------------")
-        #print("推理内容：", result["reasoning"])
-
-        print("--------------分析结果-------------------------")
-
-        print(f"{code}分析结果：", result["content"])
-        return extract_analysis_report(result["content"])
-
-    else:
-       print("警告：分析结果可能不完整，建议缩小数据范围或简化问题")
-       return ""
+        elapsed_time = end_time - start_time
+        print(f"{code}分析过程中发生异常：{str(e)}")
+        print(f"异常发生时间：{elapsed_time:.2f}秒")
+        return ""
 
 
 if __name__ == "__main__":
@@ -353,11 +438,11 @@ if __name__ == "__main__":
     #print("-----------561560---------------")
     #aiDeepSeekAnly("561560")  # 直接调用同步函数
     #print("---------588180-----------------")
-    aiDeepSeekAnly("588180")
+    #aiDeepSeekAnly("588180")
     print("---------511090-----------------")
-    #aiDeepSeekAnly("511090")
-    #print("---------159843-----------------")
-    #aiDeepSeekAnly("159843")
+    aiDeepSeekAnly("511090")
+    print("---------159843-----------------")
+    aiDeepSeekAnly("159843")
 
 
     
