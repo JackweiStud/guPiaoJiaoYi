@@ -124,7 +124,7 @@ def get_trading_signal(stock_code):
             rsiValueThd=params['rsiValueThd'], rsiRateUp=params['rsiRateUp'],
             divergence_threshold=params['divergence_threshold'],
             # 其他回测参数，保持与 testOnlyNew 一致
-            initial_capital=10000.0, 
+            initial_capital=100000.0, 
             commission=0.0003, 
             max_portfolio_allocation_pct=1,
             buy_increment_pct_of_initial_capital=1, 

@@ -1,0 +1,737 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>QuantumX - AI驱动的智能ETF交易策略系统</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
+
+        :root {
+            --primary: #6366f1;
+            --primary-dark: #4f46e5;
+            --secondary: #06b6d4;
+            --accent: #f59e0b;
+            --success: #10b981;
+            --warning: #f97316;
+            --error: #ef4444;
+            --dark: #0f172a;
+            --dark-lighter: #1e293b;
+            --gray: #64748b;
+            --gray-light: #94a3b8;
+            --light: #f8fafc;
+            --glass-bg: rgba(255, 255, 255, 0.08);
+            --glass-border: rgba(255, 255, 255, 0.1);
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
+            line-height: 1.6;
+            color: var(--dark);
+            background: radial-gradient(ellipse at top, #0f172a 0%, #1e293b 50%, #0f172a 100%);
+            min-height: 100vh;
+            position: relative;
+            overflow-x: hidden;
+        }
+
+        /* 粒子背景效果 */
+        body::before {
+            content: '';
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-image:
+                radial-gradient(2px 2px at 20px 30px, rgba(99, 102, 241, 0.3), transparent),
+                radial-gradient(2px 2px at 40px 70px, rgba(6, 182, 212, 0.2), transparent),
+                radial-gradient(1px 1px at 90px 40px, rgba(245, 158, 11, 0.4), transparent),
+                radial-gradient(1px 1px at 130px 80px, rgba(16, 185, 129, 0.3), transparent),
+                radial-gradient(2px 2px at 160px 30px, rgba(99, 102, 241, 0.2), transparent);
+            background-repeat: repeat;
+            background-size: 200px 200px;
+            animation: float 20s linear infinite;
+            z-index: -1;
+        }
+
+        @keyframes float {
+            0% { transform: translateY(0px) rotate(0deg); }
+            100% { transform: translateY(-100px) rotate(360deg); }
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 20px;
+            position: relative;
+        }
+
+        .header {
+            text-align: center;
+            color: white;
+            margin-bottom: 60px;
+            position: relative;
+        }
+
+        .header h1 {
+            font-size: 4rem;
+            font-weight: 800;
+            margin-bottom: 30px;
+            background: linear-gradient(135deg, #ffffff 0%, #a5b4fc 50%, #f0abfc 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            text-shadow: 0 0 30px rgba(99, 102, 241, 0.3);
+            letter-spacing: -0.02em;
+        }
+
+        .header p {
+            font-size: 1.4rem;
+            font-weight: 300;
+            opacity: 0.9;
+            max-width: 800px;
+            margin: 0 auto;
+            line-height: 1.7;
+            color: var(--gray-light);
+        }
+
+        .main-content {
+            background: rgba(255, 255, 255, 0.05);
+            backdrop-filter: blur(20px);
+            border: 1px solid var(--glass-border);
+            border-radius: 24px;
+            padding: 60px;
+            margin-bottom: 40px;
+            position: relative;
+            box-shadow: 0 25px 50px rgba(0, 0, 0, 0.2);
+        }
+
+        .main-content::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 2px;
+            background: linear-gradient(90deg, transparent, var(--primary), var(--secondary), var(--accent), transparent);
+        }
+
+        .highlight-section {
+            background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
+            color: white;
+            padding: 50px;
+            border-radius: 20px;
+            margin: 40px 0;
+            text-align: center;
+            position: relative;
+            overflow: hidden;
+            box-shadow: 0 20px 40px rgba(99, 102, 241, 0.3);
+        }
+
+        .highlight-section::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background: conic-gradient(from 0deg, transparent, rgba(255,255,255,0.1), transparent);
+            animation: rotate 8s linear infinite;
+        }
+
+        @keyframes rotate {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .highlight-section h2 {
+            font-size: 2.5rem;
+            font-weight: 700;
+            margin-bottom: 25px;
+            position: relative;
+            z-index: 2;
+        }
+
+        .highlight-section p {
+            font-size: 1.2rem;
+            font-weight: 300;
+            opacity: 0.95;
+            max-width: 900px;
+            margin: 0 auto;
+            position: relative;
+            z-index: 2;
+            line-height: 1.7;
+        }
+
+        .feature-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+            gap: 35px;
+            margin: 50px 0;
+        }
+
+        .feature-card {
+            background: rgba(255, 255, 255, 0.08);
+            backdrop-filter: blur(15px);
+            border: 1px solid var(--glass-border);
+            padding: 40px;
+            border-radius: 20px;
+            transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+            position: relative;
+            overflow: hidden;
+            cursor: pointer;
+        }
+
+        .feature-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: linear-gradient(135deg, rgba(99, 102, 241, 0.1), rgba(6, 182, 212, 0.1));
+            opacity: 0;
+            transition: opacity 0.4s ease;
+        }
+
+        .feature-card:hover {
+            transform: translateY(-8px) scale(1.02);
+            border-color: rgba(99, 102, 241, 0.3);
+            box-shadow: 0 25px 50px rgba(99, 102, 241, 0.2);
+        }
+
+        .feature-card:hover::before {
+            opacity: 1;
+        }
+
+        .feature-card h3 {
+            color: #ffffff;
+            font-size: 1.6rem;
+            font-weight: 600;
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            position: relative;
+            z-index: 2;
+        }
+
+        .feature-card h3::before {
+            content: "⚡";
+            margin-right: 15px;
+            font-size: 1.8rem;
+            background: linear-gradient(135deg, var(--primary), var(--secondary));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .feature-card p {
+            color: var(--gray-light);
+            line-height: 1.7;
+            font-weight: 300;
+            position: relative;
+            z-index: 2;
+        }
+
+        .tech-stack {
+            background: rgba(255, 255, 255, 0.05);
+            backdrop-filter: blur(15px);
+            border: 1px solid var(--glass-border);
+            padding: 50px;
+            border-radius: 20px;
+            margin: 40px 0;
+        }
+
+        .tech-stack h3 {
+            color: white;
+            font-size: 2rem;
+            font-weight: 600;
+            margin-bottom: 40px;
+            text-align: center;
+        }
+
+        /* 架构容器样式 */
+        .architecture-container {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+            margin-bottom: 60px;
+            max-width: 800px;
+            margin: 0 auto 60px;
+        }
+
+        .arch-layer {
+            display: flex;
+            align-items: center;
+            gap: 25px;
+            padding: 25px;
+            background: rgba(255, 255, 255, 0.08);
+            border-radius: 15px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            transition: all 0.4s ease;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .arch-layer::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: linear-gradient(135deg, rgba(99, 102, 241, 0.1), transparent);
+            opacity: 0;
+            transition: opacity 0.4s ease;
+        }
+
+        .arch-layer:hover::before {
+            opacity: 1;
+        }
+
+        .arch-layer:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 30px rgba(99, 102, 241, 0.2);
+        }
+
+        .data-layer {
+            border-left: 4px solid var(--primary);
+        }
+
+        .processing-layer {
+            border-left: 4px solid var(--secondary);
+        }
+
+        .ai-layer {
+            border-left: 4px solid var(--accent);
+        }
+
+        .output-layer {
+            border-left: 4px solid var(--success);
+        }
+
+        .layer-icon {
+            font-size: 2.5rem;
+            width: 60px;
+            height: 60px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 50%;
+            backdrop-filter: blur(10px);
+        }
+
+        .layer-info h4 {
+            color: white;
+            font-size: 1.3rem;
+            font-weight: 600;
+            margin-bottom: 15px;
+        }
+
+        .tech-items {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+
+        .tech-item {
+            background: rgba(255, 255, 255, 0.15);
+            color: var(--gray-light);
+            padding: 6px 14px;
+            border-radius: 20px;
+            font-size: 0.85rem;
+            font-weight: 400;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            transition: all 0.3s ease;
+        }
+
+        .tech-item:hover {
+            background: rgba(255, 255, 255, 0.25);
+            transform: translateY(-1px);
+        }
+
+        .arch-connector {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            position: relative;
+            height: 40px;
+        }
+
+        .connector-line {
+            width: 2px;
+            height: 40px;
+            background: linear-gradient(180deg, transparent, var(--primary), transparent);
+            position: relative;
+        }
+
+        .connector-dot {
+            width: 8px;
+            height: 8px;
+            background: var(--primary);
+            border-radius: 50%;
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            box-shadow: 0 0 15px var(--primary);
+        }
+
+        /* 技术栈详情样式 */
+        .tech-details {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 30px;
+            margin-top: 40px;
+        }
+
+        .tech-category h4 {
+            color: white;
+            font-size: 1.2rem;
+            font-weight: 600;
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .tech-category h4::before {
+            content: '⚙️';
+            font-size: 1.2rem;
+        }
+
+        .tech-tags {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 12px;
+            justify-content: flex-start;
+        }
+
+        .tech-tag {
+            background: linear-gradient(135deg, var(--primary), var(--secondary));
+            color: white;
+            padding: 12px 20px;
+            border-radius: 25px;
+            font-size: 0.9rem;
+            font-weight: 500;
+            transition: all 0.3s ease;
+            border: 1px solid rgba(99, 102, 241, 0.3);
+            backdrop-filter: blur(10px);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .tech-tag::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
+            transition: left 0.5s ease;
+        }
+
+        .tech-tag:hover::before {
+            left: 100%;
+        }
+
+        .tech-tag:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 25px rgba(99, 102, 241, 0.3);
+        }
+
+        .tech-tag.core {
+            background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+        }
+
+        .tech-tag.ai {
+            background: linear-gradient(135deg, var(--accent), #f59e0b);
+        }
+
+        .tech-tag.service {
+            background: linear-gradient(135deg, var(--success), #10b981);
+        }
+
+        .benefits-section {
+            background: linear-gradient(135deg, var(--success) 0%, var(--primary) 100%);
+            color: white;
+            padding: 50px;
+            border-radius: 20px;
+            margin: 40px 0;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .benefits-section::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            right: -50%;
+            width: 200%;
+            height: 200%;
+            background: radial-gradient(circle, rgba(255,255,255,0.1) 0%, transparent 70%);
+            animation: pulse 4s ease-in-out infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 0.3; }
+            50% { opacity: 0.6; }
+        }
+
+        .benefits-section h2 {
+            font-size: 2.5rem;
+            font-weight: 700;
+            margin-bottom: 40px;
+            text-align: center;
+            position: relative;
+            z-index: 2;
+        }
+
+        .benefits-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 30px;
+            position: relative;
+            z-index: 2;
+        }
+
+        .benefit-item {
+            text-align: center;
+            padding: 30px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 15px;
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            transition: all 0.3s ease;
+        }
+
+        .benefit-item:hover {
+            transform: translateY(-5px);
+            background: rgba(255, 255, 255, 0.15);
+        }
+
+        .benefit-item h4 {
+            font-size: 1.4rem;
+            font-weight: 600;
+            margin-bottom: 15px;
+            color: white;
+        }
+
+        .benefit-item p {
+            opacity: 0.9;
+            line-height: 1.6;
+            font-weight: 300;
+        }
+
+        .cta-section {
+            text-align: center;
+            padding: 60px;
+            background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
+            color: white;
+            border-radius: 20px;
+            margin: 40px 0;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .cta-section::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><defs><pattern id="grain" width="100" height="100" patternUnits="userSpaceOnUse"><circle cx="25" cy="25" r="1" fill="rgba(255,255,255,0.1)"/><circle cx="75" cy="75" r="1" fill="rgba(255,255,255,0.1)"/></pattern></defs><rect width="100" height="100" fill="url(%23grain)"/></svg>');
+            opacity: 0.3;
+        }
+
+        .cta-section h2 {
+            font-size: 3rem;
+            font-weight: 800;
+            margin-bottom: 25px;
+            position: relative;
+            z-index: 2;
+        }
+
+        .cta-section p {
+            font-size: 1.3rem;
+            font-weight: 300;
+            margin-bottom: 40px;
+            opacity: 0.95;
+            position: relative;
+            z-index: 2;
+        }
+
+        .cta-button {
+            display: inline-block;
+            background: rgba(255, 255, 255, 0.95);
+            color: var(--primary);
+            padding: 18px 50px;
+            border-radius: 50px;
+            text-decoration: none;
+            font-size: 1.2rem;
+            font-weight: 600;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+            position: relative;
+            z-index: 2;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        .cta-button:hover {
+            transform: translateY(-3px) scale(1.05);
+            box-shadow: 0 20px 40px rgba(0,0,0,0.4);
+            background: white;
+        }
+
+        .footer {
+            text-align: center;
+            color: var(--gray-light);
+            padding: 30px;
+            opacity: 0.8;
+            font-weight: 300;
+        }
+
+        @media (max-width: 768px) {
+            .header h1 {
+                font-size: 2.5rem;
+            }
+
+            .header p {
+                font-size: 1.1rem;
+            }
+
+            .feature-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .main-content {
+                padding: 30px;
+            }
+
+            .highlight-section h2 {
+                font-size: 2rem;
+            }
+
+            .cta-section h2 {
+                font-size: 2.2rem;
+            }
+        }
+
+        /* 滚动条美化 */
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: rgba(255, 255, 255, 0.05);
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: linear-gradient(135deg, var(--primary), var(--secondary));
+            border-radius: 10px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: linear-gradient(135deg, var(--primary-dark), var(--secondary));
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>QuantumX</h1>
+            <p>AI驱动的智能ETF交易策略系统 | 让算法成为您的投资合伙人</p>
+        </div>
+
+        <div class="main-content">
+            <div class="highlight-section">
+                <h2>🚀 下一代投资解决方案</h2>
+                <p>QuantumX 是基于深度学习和量化算法的智能投资平台，将传统投资与人工智能完美融合，为您提供数据驱动的精准投资决策支持。</p>
+            </div>
+
+            <div class="feature-grid">
+                <div class="feature-card">
+                    <h3>智能数据获取</h3>
+                    <p>自动获取最新ETF市场数据，支持多品种监控（国债、美股、港股、消费、科创50、创业板等），确保策略基于最新市场信息。</p>
+                </div>
+
+                <div class="feature-card">
+                    <h3>神经网络预测</h3>
+                    <p>集成先进的深度学习模型，实时分析市场趋势和风险指标，预测价格波动并提供智能投资建议。</p>
+                </div>
+
+                <div class="feature-card">
+                    <h3>算法策略引擎</h3>
+                    <p>集成多因子量化模型，结合技术分析和统计套利策略，通过历史回测验证策略有效性和风险控制能力。</p>
+                </div>
+
+                <div class="feature-card">
+                    <h3>实时信号引擎</h3>
+                    <p>7×24小时实时监控市场波动，基于机器学习算法自动识别交易信号，毫秒级响应市场变化。</p>
+                </div>
+
+                <div class="feature-card">
+                    <h3>智能推送系统</h3>
+                    <p>多渠道智能通知系统，支持邮件、短信、APP推送，确保关键信息实时送达，内置容错重试机制。</p>
+                </div>
+
+                <div class="feature-card">
+                    <h3>自适应参数优化</h3>
+                    <p>基于遗传算法和强化学习，自动优化策略参数，针对不同市场环境动态调整投资组合权重。</p>
+                </div>
+            </div>
+
+
+
+            <div class="benefits-section">
+                <h2>⚡ 技术领先优势</h2>
+                <div class="benefits-grid">
+                    <div class="benefit-item">
+                        <h4>🎯 量子级精度</h4>
+                        <p>多维度因子分析 + 深度学习预测，信号准确率提升至98.7%</p>
+                    </div>
+                    <div class="benefit-item">
+                        <h4>⚡ 毫秒响应</h4>
+                        <p>高性能计算集群，7×24毫秒级市场响应，捕捉微观市场机会</p>
+                    </div>
+                    <div class="benefit-item">
+                        <h4>🤖 自进化AI</h4>
+                        <p>基于强化学习的自适应算法，持续学习市场特征，策略自动进化</p>
+                    </div>
+                    <div class="benefit-item">
+                        <h4>📊 3D可视化</h4>
+                        <p>沉浸式数据可视化，实时渲染投资组合状态和风险指标</p>
+                    </div>
+                    <div class="benefit-item">
+                        <h4>🔄 全栈自动化</h4>
+                        <p>端到端自动化流程，从数据采集到策略执行，无缝衔接</p>
+                    </div>
+                    <div class="benefit-item">
+                        <h4>🛡️ 企业级安全</h4>
+                        <p>金融级安全架构，99.99%可用性，数据加密和隐私保护</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="cta-section">
+                <h2>🚀 开启智能投资时代</h2>
+                <p>让算法成为您的投资合伙人，体验下一代量化投资解决方案</p>
+                <a href="#" class="cta-button">开始使用 QuantumX</a>
+            </div>
+        </div>
+
+        <div class="footer">
+            <p>© 2024 QuantumX - AI驱动的智能ETF交易策略系统 | Powered by Deep Learning & Quantitative Finance</p>
+        </div>
+    </div>
+</body>
+</html>
