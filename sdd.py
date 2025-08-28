@@ -1010,7 +1010,7 @@ def testOnlyNew(symbol):
    divergence_threshold=Parameters['divergence_threshold']
 
    # --- 回测参数 ---
-   initial_capital=10000.0
+   initial_capital=100000.0
    commission=0.0003
    max_portfolio_allocation_pct=1
    buy_increment = 1  # 每次买入动用初始总资金的百分比, 1为全仓
@@ -1081,45 +1081,60 @@ class NpEncoder(json.JSONEncoder):
 
 def _find_params_worker(args):
     """
-    Worker function for findGoodParam's multiprocessing pool.
-    Runs a single backtest with a given set of parameters.
-    Unpacks arguments for multiprocessing.
+    findGoodParam 的多进程 worker。
+    支持单窗口/训练-验证/滚动窗口（通过 windows 列表传入），并聚合多个窗口的绩效。
     """
-    params, etf_data, symbol, statTime, endTime = args
+    params, etf_data, symbol, windows = args
     try:
-        performance_stats = strategyFunc(
-            data=etf_data, # 直接传递数据
-            symbol=symbol,
-            **params,
-            initial_capital=10000.0,
-            commission=0.0003,
-            max_portfolio_allocation_pct=1,
-            buy_increment_pct_of_initial_capital=1,
-            sell_decrement_pct_of_current_shares=1,
-            min_shares_per_trade=100,
-            statTime=statTime,
-            endTime=endTime,
-            plot_results=0,  # Disable plotting for optimization
-            verbose=False,   # Disable verbose logging for optimization
-            enable_file_io=False # 禁用文件写入
-        )
+        perf_list = []
+        for (w_start, w_end) in windows:
+            performance_stats = strategyFunc(
+                data=etf_data,  # 直接传递数据
+                symbol=symbol,
+                **params,
+                initial_capital=100000.0,
+                commission=0.0003,
+                max_portfolio_allocation_pct=1,
+                buy_increment_pct_of_initial_capital=1,
+                sell_decrement_pct_of_current_shares=1,
+                min_shares_per_trade=100,
+                statTime=w_start,
+                endTime=w_end,
+                plot_results=0,   # 优化阶段不画图
+                verbose=False,    # 优化阶段不打印详细日志
+                enable_file_io=False  # 禁用文件写入
+            )
+            perf_list.append(performance_stats)
+
+        # 聚合多个窗口：使用均值作为综合指标（保持与现有排序字段一致）
+        if len(perf_list) == 1:
+            agg = perf_list[0]
+        else:
+            agg = {
+                'total_return': float(np.mean([p['total_return'] for p in perf_list])),
+                'annualized_return': float(np.mean([p['annualized_return'] for p in perf_list])),
+                'sharpe_ratio': float(np.mean([p['sharpe_ratio'] for p in perf_list])),
+                'max_drawdown': float(np.mean([p['max_drawdown'] for p in perf_list]))
+            }
 
         return {
             'params': params,
-            'total_return': performance_stats['total_return'],
-            'annualized_return': performance_stats['annualized_return'],
-            'sharpe_ratio': performance_stats['sharpe_ratio'],
-            'max_drawdown': performance_stats['max_drawdown']
+            'total_return': agg['total_return'],
+            'annualized_return': agg['annualized_return'],
+            'sharpe_ratio': agg['sharpe_ratio'],
+            'max_drawdown': agg['max_drawdown']
         }
-    except Exception as e:
-        # Optional: Log the error. For now, just returning None is fine.
+    except Exception:
         # print(f"\nError with params {params}: {e}")
         return None
 
-def findGoodParam(symbol, 
-                param_grid=None, 
+def findGoodParam(symbol,
+                param_grid=None,
                 statTime='2021-1-30',
-                endTime='2025-3-10'):
+                endTime='2025-3-10',
+                eval_mode='single',
+                validate_ratio=0.3,
+                rolling_splits=None):
     #filepath="D:\\Code\\Ai\\jinrongTest\\github\\stock_data\\588180_Day.csv" # 科创50
     filepath = os.path.join(project_root, 'stock_data', f'{symbol}', f'{symbol}_Day.csv')
     print(f"Loading data from: {filepath}") 
@@ -1129,6 +1144,39 @@ def findGoodParam(symbol,
 
     stock_data_folder = os.path.dirname(filepath) # .../stock_data/symbol
     print(stock_data_folder) 
+
+    # 生成评估窗口
+    # 单窗口：[(statTime, endTime)]
+    # 训练-验证：仅在验证窗口上打分（后段比例 validate_ratio）
+    # 滚动窗口：按 rolling_splits 等分时间段
+    try:
+        date_index = etf_data.loc[statTime:endTime].index
+        if len(date_index) == 0:
+            print("给定时间范围内无数据，回退为全量数据窗口。")
+            windows = [(statTime, endTime)]
+        else:
+            if eval_mode == 'train_validate':
+                split_idx = int(len(date_index) * (1 - validate_ratio))
+                val_start = date_index[max(split_idx, 0)].strftime('%Y-%m-%d')
+                windows = [(val_start, endTime)]
+                print(f"评估模式: 训练-验证，仅在验证集评估 -> 验证窗口: {val_start} ~ {endTime}")
+            elif eval_mode == 'rolling' and isinstance(rolling_splits, int) and rolling_splits >= 2:
+                # 等分 rolling_splits 份
+                split_points = np.linspace(0, len(date_index), rolling_splits + 1, dtype=int)
+                windows = []
+                for i in range(rolling_splits):
+                    s_idx, e_idx = split_points[i], max(split_points[i + 1] - 1, split_points[i])
+                    w_start = date_index[s_idx].strftime('%Y-%m-%d')
+                    w_end = date_index[e_idx].strftime('%Y-%m-%d')
+                    windows.append((w_start, w_end))
+                print(f"评估模式: 滚动窗口，共 {len(windows)} 段 -> {windows}")
+            else:
+                windows = [(statTime, endTime)]
+                if eval_mode != 'single':
+                    print("评估模式参数无效或未指定，已回退为单窗口评估。")
+    except Exception as _:
+        windows = [(statTime, endTime)]
+        print("生成评估窗口失败，已回退为单窗口评估。")
 
     # 生成所有参数组合
     keys, values = zip(*param_grid.items())
@@ -1150,7 +1198,7 @@ def findGoodParam(symbol,
     
     # 2. 准备要传递给工作进程的参数
     # 将共享的参数与每个变化的参数组合打包
-    tasks = [(p, etf_data, symbol, statTime, endTime) for p in valid_combinations]
+    tasks = [(p, etf_data, symbol, windows) for p in valid_combinations]
 
     results = []
     # 使用多进程池并行执行回测
@@ -1311,27 +1359,827 @@ def gangguxiaofeiETFParaFind():
 def gangguxiaofeiETFParaFind511090():   
 
    symbol = "511090"
-   custom_param_grid = {
-        'short_window': np.arange(3, 6, 1),            # 从3到8，步长为2
-        'long_window': np.arange(10, 20, 2),           # 从10到30，步长为5
-        'volume_mavg_Value': np.arange(5, 15, 2),      # 从5到15，步长为5
-        'MaRateUp': np.arange(1, 3, 0.5),          # 从0.5到1.5，步长为0.5
-        'VolumeSellRate': np.arange(1.0, 6.0, 1),    # 从2.0到8.0，步长为2.0
-        'rsi_period': np.arange(7, 16, 2),             # 从7到20，步长为3
-        'rsiValueThd': np.arange(21, 33, 1),          # 从10到50，步长为10
-        'rsiRateUp': np.arange(1, 3, 1),         # 从0.5到5.0，步长为1.0
-        'divergence_threshold': np.round(np.arange(0.005, 0.02, 0.001), 4) # 从0.03到0.1，步长为0.02
-    }
+    # 硬性筛选阈值
+   MAX_MDD_TRAIN = 0.20   # 训练集最大回撤上限（绝对值）
+   MIN_TRADES_TRAIN = 5  # 训练集最小交易次数
    
-   # 使用自定义参数网格和时间范围调用findGoodParam2
-   findGoodParam(
-       symbol = symbol,
-       param_grid = custom_param_grid,
-       statTime = '2021-03-10',
-       endTime = '2025-03-10'
-   )
+   # 加载数据
+   filepath = os.path.join(project_root, 'stock_data', f'{symbol}', f'{symbol}_Day.csv')
+   if not os.path.exists(filepath):
+       print(f"错误：数据文件不存在 -> {filepath}")
+       return
+   etf_data = load_etf_data(filepath)
+   if len(etf_data.index) < 100:
+       print("数据量过少，无法进行7:3切分与参数搜索。")
+       return
+
+   # 7:3 时间切分（按时间顺序，前70%为训练，后30%为验证）
+   full_index = etf_data.index
+   split_idx = int(len(full_index) * 0.7)
+   train_start = full_index[0].strftime('%Y-%m-%d')
+   train_end = full_index[split_idx - 1].strftime('%Y-%m-%d')
+   valid_start = full_index[split_idx].strftime('%Y-%m-%d')
+   valid_end = full_index[-1].strftime('%Y-%m-%d')
+   print(f"训练窗口: {train_start} ~ {train_end}；验证窗口: {valid_start} ~ {valid_end}")
+
+  
+
+   # 随机采样工具
+   rng = np.random.default_rng()
+
+   def sample_params_phase1():
+       # 阶段一参数采样（随机搜索，覆盖优区间）
+       p = {}
+       p['short_window'] = int(rng.integers(2, 6))
+       # long 必须 > short
+       p['long_window'] = int(max(p['short_window'] + 1, rng.integers(10, 19)))
+       p['volume_mavg_Value'] = int(rng.integers(5, 10))
+       p['MaRateUp'] = float(np.round(rng.uniform(0.90, 1.15), 2))
+       p['VolumeSellRate'] = int(rng.integers(3, 7))
+       p['rsi_period'] = int(rng.integers(8, 15))
+       p['rsiValueThd'] = int(rng.integers(26, 37))
+       p['rsiRateUp'] = float(np.round(rng.uniform(0.90, 1.50), 2))
+       p['divergence_threshold'] = float(np.round(rng.uniform(0.005, 0.020), 3))
+       if p['long_window'] <= p['short_window']:
+           p['long_window'] = p['short_window'] + 1
+       return p
+
+   def jitter(value, pct, is_int=False, floor=None, ceil=None, step=None):
+       # 在±pct范围内扰动，保持边界与步进
+       low = value * (1 - pct)
+       high = value * (1 + pct)
+       if step is not None:
+           # 对连续值按步进网格化
+           grid_val = np.round(rng.uniform(low, high) / step) * step
+           v = float(grid_val)
+       else:
+           v = float(rng.uniform(low, high))
+       if floor is not None:
+           v = max(v, floor)
+       if ceil is not None:
+           v = min(v, ceil)
+       if is_int:
+           return int(np.round(v))
+       return float(v)
+
+   def sample_params_phase2(base):
+       # 阶段二微调（每维±10%），同时收缩边界并保证合法性
+       q = {}
+       q['short_window'] = jitter(base['short_window'], 0.10, is_int=True, floor=2, ceil=5)
+       q['long_window'] = jitter(base['long_window'], 0.10, is_int=True, floor=10, ceil=18)
+       if q['long_window'] <= q['short_window']:
+           q['long_window'] = q['short_window'] + 1
+       q['volume_mavg_Value'] = jitter(base['volume_mavg_Value'], 0.10, is_int=True, floor=5, ceil=9)
+       q['MaRateUp'] = float(np.round(jitter(base['MaRateUp'], 0.10, floor=0.90, ceil=1.15, step=0.01), 2))
+       q['VolumeSellRate'] = jitter(base['VolumeSellRate'], 0.10, is_int=True, floor=3, ceil=6)
+       q['rsi_period'] = jitter(base['rsi_period'], 0.10, is_int=True, floor=8, ceil=14)
+       q['rsiValueThd'] = jitter(base['rsiValueThd'], 0.10, is_int=True, floor=26, ceil=36)
+       q['rsiRateUp'] = float(np.round(jitter(base['rsiRateUp'], 0.10, floor=0.90, ceil=1.50, step=0.02), 2))
+       q['divergence_threshold'] = float(np.round(jitter(base['divergence_threshold'], 0.10, floor=0.005, ceil=0.020, step=0.001), 3))
+       return q
+
+   def compute_trades_and_winrate(portfolio_df, price_series):
+       # 基于实际执行信号与收盘价，统计完整交易回合数与胜率
+       trades = 0
+       wins = 0
+       in_pos = False
+       entry_price = None
+       # 对齐索引
+       common_idx = portfolio_df.index.intersection(price_series.index)
+       for dt in common_idx:
+           sig = portfolio_df.loc[dt, 'signal'] if 'signal' in portfolio_df.columns else 0
+           px = price_series.loc[dt]
+           if sig == 1 and (not in_pos):
+               in_pos = True
+               entry_price = px
+           elif sig == -1 and in_pos:
+               trades += 1
+               if px > (entry_price if entry_price is not None else px):
+                   wins += 1
+               in_pos = False
+               entry_price = None
+       win_rate = (wins / trades) if trades > 0 else 0.0
+       return int(trades), float(win_rate)
+
+   def evaluate_on_window(params, w_start, w_end):
+       perf = strategyFunc(
+           data=etf_data,
+           symbol=symbol,
+           short_window=np.int64(params['short_window']),
+           long_window=np.int64(params['long_window']),
+           volume_mavg_Value=np.int64(params['volume_mavg_Value']),
+           MaRateUp=np.float64(params['MaRateUp']),
+           VolumeSellRate=np.float64(params['VolumeSellRate']),
+           rsi_period=np.int64(params['rsi_period']),
+           rsiValueThd=np.int64(params['rsiValueThd']),
+           rsiRateUp=np.float64(params['rsiRateUp']),
+           divergence_threshold=np.float64(params['divergence_threshold']),
+           # 固定为一次性全仓/全卖以便统计交易回合
+           buy_increment_pct_of_initial_capital=1,
+           sell_decrement_pct_of_current_shares=1,
+           statTime=w_start,
+           endTime=w_end,
+           plot_results=0,
+           verbose=False,
+           enable_file_io=False
+       )
+       ann = float(perf['annualized_return'])
+       shp = float(perf['sharpe_ratio'])
+       mdd = float(perf['max_drawdown'])  # 注意：为负值，使用绝对值比较
+       port_df = perf['portfolio_df']
+       px_series = etf_data.loc[w_start:w_end, 'CloseValue']
+       trades, win_rate = compute_trades_and_winrate(port_df, px_series)
+       return {
+           'annualized_return': ann,
+           'sharpe_ratio': shp,
+           'max_drawdown': mdd,
+           'trades': trades,
+           'win_rate': win_rate
+       }
+
+   def evaluate_params(params):
+       # 训练窗口
+       train_metrics = evaluate_on_window(params, train_start, train_end)
+       # 硬性筛选：MDD_train ≤ 10%，交易数 ≥ MIN_TRADES_TRAIN
+       if abs(train_metrics['max_drawdown']) > MAX_MDD_TRAIN or train_metrics['trades'] < MIN_TRADES_TRAIN:
+           return None
+       # 验证窗口用于新评分
+       valid_metrics = evaluate_on_window(params, valid_start, valid_end)
+       score_train = 0.7 * valid_metrics['sharpe_ratio'] + 0.3 * train_metrics['sharpe_ratio']
+       return {
+           'params': params,
+           'score_train': float(score_train),
+           'train': train_metrics,
+           'valid': valid_metrics
+       }
+
+   # 阶段一：随机搜索 2000 组
+   stage1_results = []
+   NUM_PHASE1 = 2000
+   print(f"阶段一随机搜索开始，总计 {NUM_PHASE1} 组...")
+   t0 = time.time()
+   step1 = max(1, NUM_PHASE1 // 20)
+   for i in range(NUM_PHASE1):
+       params = sample_params_phase1()
+       res = evaluate_params(params)
+       if res is not None:
+           stage1_results.append(res)
+       if (i + 1) % step1 == 0 or (i + 1) == NUM_PHASE1:
+           elapsed = time.time() - t0
+           per_iter = elapsed / (i + 1)
+           remain = per_iter * (NUM_PHASE1 - (i + 1))
+           print(f"阶段一进度: {i+1}/{NUM_PHASE1} ({(i+1)/NUM_PHASE1*100:.1f}%)，已用时 {elapsed/60:.1f} 分钟，预计剩余 {max(remain,0)/60:.1f} 分钟")
+           sys.stdout.flush()
+   if not stage1_results:
+       print("阶段一无有效结果（受MDD或交易数限制）。")
+       return
+
+   # 按 Score_train 排序，Tie-break: 低MDD_train -> 高交易数 -> 高胜率
+   stage1_results.sort(key=lambda r: (
+       r['score_train'],
+       -abs(r['train']['max_drawdown']),
+       r['train']['trades'],
+       r['train']['win_rate']
+   ), reverse=True)
+   top_bases = stage1_results[:50]
+
+   # 阶段二：对 Top-50 做局部细化随机搜索（约 1000 组）
+   stage2_results = []
+   NUM_PHASE2 = 1000
+   print(f"阶段二局部细化开始，总计 {NUM_PHASE2} 组...")
+   t1 = time.time()
+   step2 = max(1, NUM_PHASE2 // 20)
+   for j in range(NUM_PHASE2):
+       base = top_bases[int(rng.integers(0, len(top_bases)))]
+       params2 = sample_params_phase2(base['params'])
+       res2 = evaluate_params(params2)
+       if res2 is not None:
+           stage2_results.append(res2)
+       if (j + 1) % step2 == 0 or (j + 1) == NUM_PHASE2:
+           elapsed2 = time.time() - t1
+           per_iter2 = elapsed2 / (j + 1)
+           remain2 = per_iter2 * (NUM_PHASE2 - (j + 1))
+           print(f"阶段二进度: {j+1}/{NUM_PHASE2} ({(j+1)/NUM_PHASE2*100:.1f}%)，已用时 {elapsed2/60:.1f} 分钟，预计剩余 {max(remain2,0)/60:.1f} 分钟")
+           sys.stdout.flush()
+   # 合并候选并重新排序
+   all_candidates = top_bases + stage2_results
+   all_candidates.sort(key=lambda r: (
+       r['score_train'],
+       -abs(r['train']['max_drawdown']),
+       r['train']['trades'],
+       r['train']['win_rate']
+   ), reverse=True)
+   final_top50 = all_candidates[:50]
+
+   # 输出日志与CSV
+   stock_data_folder = os.path.dirname(filepath)
+   log_path = os.path.join(stock_data_folder, f'{symbol}_FindReturn_7_3.log')
+   try:
+       with open(log_path, 'w', encoding='utf-8') as f:
+           f.write(f"Top 50 参数组合（{symbol}，7:3 切分）\n")
+           f.write("排序: Score = 0.7*Sharpe_valid + 0.3*Sharpe_train；Tie: 低MDD -> 高交易数 -> 高胜率\n")
+           f.write(f"硬性筛选: MDD_train ≤ {MAX_MDD_TRAIN*100}%，min_trades_train ≥ {MIN_TRADES_TRAIN}\n")
+           f.write("="*60 + "\n")
+           for i, r in enumerate(final_top50, start=1):
+               tr = r['train']; va = r['valid']
+               risk_note = []
+               if abs(va['max_drawdown']) > 0.12:
+                   risk_note.append("验证MDD>12%")
+               if va['trades'] < 10:
+                   risk_note.append("验证交易数<10")
+               risk_str = ("；".join(risk_note)) if risk_note else ""
+               f.write(f"Rank {i}: Score={r['score_train']:.4f} {(' ['+risk_str+']') if risk_str else ''}\n")
+               f.write(f"  参数: {json.dumps(r['params'], ensure_ascii=False, cls=NpEncoder)}\n")
+               f.write(f"  Train: Sharpe={tr['sharpe_ratio']:.3f}, AnnRet={tr['annualized_return']*100:.2f}%, MaxDD={tr['max_drawdown']*100:.2f}%, Trades={tr['trades']}, WinRate={tr['win_rate']*100:.1f}%\n")
+               f.write(f"  Valid: Sharpe={va['sharpe_ratio']:.3f}, AnnRet={va['annualized_return']*100:.2f}%, MaxDD={va['max_drawdown']*100:.2f}%, Trades={va['trades']}, WinRate={va['win_rate']*100:.1f}%\n")
+               f.write("-"*40 + "\n")
+       print(f"Top 50 日志已写入: {log_path}")
+   except Exception as e:
+       print(f"写入日志失败: {e}")
+
+   # 生成CSV
+   csv_path = os.path.join(os.path.dirname(os.path.dirname(filepath)), 'pic', f'{symbol}_top50.csv')
+   try:
+       os.makedirs(os.path.dirname(csv_path), exist_ok=True)
+       rows = []
+       for r in final_top50:
+           row = {
+               'short_window': r['params']['short_window'],
+               'long_window': r['params']['long_window'],
+               'volume_mavg_Value': r['params']['volume_mavg_Value'],
+               'MaRateUp': r['params']['MaRateUp'],
+               'VolumeSellRate': r['params']['VolumeSellRate'],
+               'rsi_period': r['params']['rsi_period'],
+               'rsiValueThd': r['params']['rsiValueThd'],
+               'rsiRateUp': r['params']['rsiRateUp'],
+               'divergence_threshold': r['params']['divergence_threshold'],
+               'Train_Sharpe': r['train']['sharpe_ratio'],
+               'Train_AnnRet': r['train']['annualized_return'],
+               'Train_MaxDD': r['train']['max_drawdown'],
+               'Train_Trades': r['train']['trades'],
+               'Train_WinRate': r['train']['win_rate'],
+               'Valid_Sharpe': r['valid']['sharpe_ratio'],
+               'Valid_AnnRet': r['valid']['annualized_return'],
+               'Valid_MaxDD': r['valid']['max_drawdown'],
+               'Valid_Trades': r['valid']['trades'],
+               'Valid_WinRate': r['valid']['win_rate'],
+               'Score_train': r['score_train']
+           }
+           rows.append(row)
+       pd.DataFrame(rows).to_csv(csv_path, index=False)
+       print(f"Top 50 CSV 已生成: {csv_path}")
+   except Exception as e:
+       print(f"写入CSV失败: {e}")
 
 
+
+def _compute_basic_stats_for_symbol(df):
+    """
+    计算股票/ETF的基础统计特征，用于策略参数优化
+    
+    该函数通过分析历史价格数据，计算三个关键统计指标：
+    1. 波动率(volatility)：衡量股票价格波动的剧烈程度
+    2. 70%分位数(q70)：短期与长期均线乖离率的70%分位点
+    3. 95%分位数(q95)：短期与长期均线乖离率的95%分位点
+    
+    这些统计特征将用于后续的策略参数搜索范围生成，确保参数设置
+    与股票的实际波动特征相匹配，提高策略的适应性和有效性。
+    
+    参数:
+        df (DataFrame): 包含股票历史数据的DataFrame，必须包含'CloseValue'列
+                       数据应包含足够的历史记录以计算移动平均和分位数
+    
+    返回:
+        tuple: 包含三个统计值的元组
+            - vol (float): 日收益率的标准差，即波动率
+                          - 值越大表示波动越剧烈
+                          - 通常范围：0.001-0.100
+            - q70 (float): 乖离率70%分位数，用于设置背离阈值下限
+                          - 基于5日和20日移动平均线的乖离率计算
+                          - 值越大表示短期均线相对长期均线偏离越明显
+            - q95 (float): 乖离率95%分位数，用于设置背离阈值上限
+                          - 基于5日和20日移动平均线的乖离率计算
+                          - 用于识别极端偏离情况
+    
+    计算逻辑:
+        1. 波动率计算：使用日收益率的标准差，反映价格变化的离散程度
+        2. 乖离率计算：(长期均线 - 短期均线) / 长期均线
+        3. 分位数计算：仅考虑正乖离率（短期均线在长期均线之上）
+        4. 异常处理：处理无穷大和NaN值，确保计算稳定性
+    
+    应用场景:
+        - 策略参数优化：为不同波动率水平的股票生成差异化参数范围
+        - 风险控制：高波动率股票使用更保守的参数设置
+        - 背离策略：基于乖离率分位数动态调整背离阈值
+    """
+    # 计算日收益和波动率
+    close = df['CloseValue'].astype(float)
+    ret = close.pct_change().dropna()
+    vol = float(ret.std())
+    # 估算5/20均线与乖离率分位数
+    s_ma = close.rolling(window=5, min_periods=5).mean()
+    l_ma = close.rolling(window=20, min_periods=20).mean()
+    div = (l_ma - s_ma) / l_ma
+    div = div.replace([np.inf, -np.inf], np.nan).dropna()
+    if len(div) == 0:
+        q70 = 0.005
+        q95 = 0.02
+    else:
+        q70 = float(np.nanpercentile(div.clip(lower=0), 70))
+        q95 = float(np.nanpercentile(div.clip(lower=0), 95))
+    return vol, q70, q95
+
+
+def _derive_phase1_ranges_from_stats(vol, q70, q95):
+    """
+    根据波动率统计特征动态生成策略参数搜索范围
+    
+    该函数基于股票的波动率特征和分位数统计，为不同波动率水平的股票/ETF
+    生成差异化的策略参数搜索范围。通过波动率分层，确保参数搜索更有针对性，
+    提高参数优化的效率和效果。
+    
+    参数:
+        vol (float): 股票/ETF的波动率，用于判断风险水平
+                   - vol < 0.005: 低波动率（低风险）
+                   - 0.005 <= vol < 0.012: 中波动率（中等风险）
+                   - vol >= 0.012: 高波动率（高风险）
+        q70 (float): 70%分位数，用于确定divergence_threshold的下限
+        q95 (float): 95%分位数，用于确定divergence_threshold的上限
+    
+    返回:
+        dict: 包含各策略参数搜索范围的字典，每个参数包含：
+            - 元组格式：(最小值, 最大值, 数据类型, 步长)
+            - 数据类型: 'int' 表示整数参数，'float' 表示浮点数参数
+            - 步长: 仅在float类型时指定，用于参数搜索时的增量
+    
+    参数范围说明:
+        short_window: 短期移动平均窗口，范围2-5
+        long_window: 长期移动平均窗口，范围10-32（高波动时范围更大）
+        volume_mavg_Value: 成交量移动平均窗口，范围5-12
+        MaRateUp: 均线上升比率阈值，范围0.90-1.20
+        VolumeSellRate: 成交量卖出比率，范围3-8
+        rsi_period: RSI计算周期，范围10-20
+        rsiValueThd: RSI阈值，范围22-36
+        rsiRateUp: RSI上升比率，范围1.00-1.80
+        divergence_threshold: 背离阈值，基于q70和q95动态调整
+    
+    设计原理:
+        1. 波动率分层：根据vol值将股票分为低、中、高三个风险等级
+        2. 参数差异化：高风险股票使用更保守的参数范围，低风险股票使用更激进的参数
+        3. 动态阈值：divergence_threshold基于统计分位数动态调整，确保阈值合理性
+        4. 风险适配：高波动率股票的参数范围更宽，提供更多选择空间
+    """
+    # 根据波动率分层与分位数确定范围
+    def clamp(x, lo, hi):
+        return max(lo, min(hi, x))
+    
+    if vol < 0.005:
+        # 低波动 - 使用相对激进的参数范围
+        ranges = {
+            'short_window': (2, 5, 'int'),
+            'long_window': (10, 18, 'int'),
+            'volume_mavg_Value': (5, 9, 'int'),
+            'MaRateUp': (0.90, 1.15, 'float', 0.01),
+            'VolumeSellRate': (3, 6, 'int'),
+            'rsi_period': (10, 16, 'int'),
+            'rsiValueThd': (27, 36, 'int'),
+            'rsiRateUp': (1.00, 1.50, 'float', 0.02),
+            'divergence_threshold': (clamp(q70, 0.005, 0.020), clamp(q95, 0.005, 0.020), 'float', 0.001)
+        }
+    elif vol < 0.012:
+        # 中波动 - 使用平衡的参数范围
+        ranges = {
+            'short_window': (2, 5, 'int'),
+            'long_window': (10, 18, 'int'),
+            'volume_mavg_Value': (6, 10, 'int'),
+            'MaRateUp': (0.95, 1.18, 'float', 0.01),
+            'VolumeSellRate': (3, 7, 'int'),
+            'rsi_period': (10, 18, 'int'),
+            'rsiValueThd': (25, 35, 'int'),
+            'rsiRateUp': (1.00, 1.60, 'float', 0.02),
+            'divergence_threshold': (clamp(q70, 0.010, 0.040), clamp(q95, 0.010, 0.040), 'float', 0.001)
+        }
+    else:
+        # 高波动 - 使用保守的参数范围，提供更宽的搜索空间
+        ranges = {
+            'short_window': (2, 5, 'int'),
+            'long_window': (10, 32, 'int'),
+            'volume_mavg_Value': (7, 12, 'int'),
+            'MaRateUp': (1.00, 1.20, 'float', 0.01),
+            'VolumeSellRate': (4, 8, 'int'),
+            'rsi_period': (12, 20, 'int'),
+            'rsiValueThd': (22, 32, 'int'),
+            'rsiRateUp': (1.10, 1.80, 'float', 0.02),
+            'divergence_threshold': (clamp(q70, 0.030, 0.080), clamp(q95, 0.030, 0.080), 'float', 0.001)
+        }
+    return ranges
+
+
+def _load_phase1_ranges_from_cache(symbol):
+    try:
+        cache_path = os.path.join(project_root, 'phase1_ranges.json')
+        if not os.path.exists(cache_path):
+            return None
+        with open(cache_path, 'r', encoding='utf-8') as f:
+            data = json.load(f)
+        return data.get(symbol)
+    except Exception:
+        return None
+
+
+def _save_phase1_ranges_to_cache(symbol, ranges):
+    try:
+        cache_path = os.path.join(project_root, 'phase1_ranges.json')
+        if os.path.exists(cache_path):
+            with open(cache_path, 'r', encoding='utf-8') as f:
+                data = json.load(f)
+        else:
+            data = {}
+        data[symbol] = ranges
+        with open(cache_path, 'w', encoding='utf-8') as f:
+            json.dump(data, f, ensure_ascii=False, indent=2)
+    except Exception as e:
+        print(f"保存 phase1_ranges.json 失败: {e}")
+
+
+# find_best_params 的辅助函数（模块级，支持多进程pickle）
+def _compute_trades_and_winrate(portfolio_df, price_series):
+    """计算交易次数和胜率"""
+    trades = 0
+    wins = 0
+    in_pos = False
+    entry_price = None
+    common_idx = portfolio_df.index.intersection(price_series.index)
+    for dt in common_idx:
+        sig = portfolio_df.loc[dt, 'signal'] if 'signal' in portfolio_df.columns else 0
+        px = price_series.loc[dt]
+        if sig == 1 and (not in_pos):
+            in_pos = True
+            entry_price = px
+        elif sig == -1 and in_pos:
+            trades += 1
+            if px > (entry_price if entry_price is not None else px):
+                wins += 1
+            in_pos = False
+            entry_price = None
+    win_rate = (wins / trades) if trades > 0 else 0.0
+    return int(trades), float(win_rate)
+
+def _evaluate_on_window(params, etf_data, symbol, w_start, w_end):
+    """在指定时间窗口上评估参数"""
+    perf = strategyFunc(
+        data=etf_data,
+        symbol=symbol,
+        short_window=np.int64(params['short_window']),
+        long_window=np.int64(params['long_window']),
+        volume_mavg_Value=np.int64(params['volume_mavg_Value']),
+        MaRateUp=np.float64(params['MaRateUp']),
+        VolumeSellRate=np.float64(params['VolumeSellRate']),
+        rsi_period=np.int64(params['rsi_period']),
+        rsiValueThd=np.int64(params['rsiValueThd']),
+        rsiRateUp=np.float64(params['rsiRateUp']),
+        divergence_threshold=np.float64(params['divergence_threshold']),
+        buy_increment_pct_of_initial_capital=1,
+        sell_decrement_pct_of_current_shares=1,
+        statTime=w_start,
+        endTime=w_end,
+        plot_results=0,
+        verbose=False,
+        enable_file_io=False
+    )
+    ann = float(perf['annualized_return'])
+    shp = float(perf['sharpe_ratio'])
+    mdd = float(perf['max_drawdown'])
+    port_df = perf['portfolio_df']
+    px_series = etf_data.loc[w_start:w_end, 'CloseValue']
+    trades, win_rate = _compute_trades_and_winrate(port_df, px_series)
+    return {
+        'annualized_return': ann,
+        'sharpe_ratio': shp,
+        'max_drawdown': mdd,
+        'trades': trades,
+        'win_rate': win_rate
+    }
+
+def _find_best_params_worker(args):
+    """find_best_params 的多进程 worker"""
+    params, etf_data, symbol, train_start, train_end, valid_start, valid_end, MAX_MDD_TRAIN, MIN_TRADES_TRAIN = args
+    try:
+        # 训练集评估
+        train_metrics = _evaluate_on_window(params, etf_data, symbol, train_start, train_end)
+        
+        # 硬性约束筛选
+        if abs(train_metrics['max_drawdown']) > MAX_MDD_TRAIN or train_metrics['trades'] < MIN_TRADES_TRAIN:
+            return None
+            
+        # 验证集评估
+        valid_metrics = _evaluate_on_window(params, etf_data, symbol, valid_start, valid_end)
+        
+        # 计算综合评分
+        score_train = 0.7 * valid_metrics['sharpe_ratio'] + 0.3 * train_metrics['sharpe_ratio']
+        
+        return {
+            'params': params,
+            'score_train': float(score_train),
+            'train': train_metrics,
+            'valid': valid_metrics
+        }
+    except Exception:
+        return None
+
+def find_best_params(symbol, phase1_cfg=None, constraints=None, seed=None, num_processes=None):
+    """
+    为指定股票/ETF寻找最优策略参数组合（并行化版本）
+    
+    该函数采用两阶段参数优化策略：
+    1. 阶段一：在大范围内随机搜索，筛选出表现较好的基础参数组合
+    2. 阶段二：基于阶段一的结果进行局部细化，进一步提升参数质量
+    
+    参数:
+        symbol (str): 股票/ETF代码，如"511090"
+        phase1_cfg (dict, optional): 阶段一的参数范围配置，如果为None则从缓存加载或自适应计算
+        constraints (dict, optional): 约束条件，包含：
+            - MAX_MDD_TRAIN (float): 训练集最大回撤限制，默认0.20 (20%)
+            - MIN_TRADES_TRAIN (int): 训练集最小交易次数，默认5
+        seed (int, optional): 随机数种子，用于结果可重现
+        num_processes (int, optional): 并行进程数，默认为CPU核心数
+    
+    返回:
+        list: 包含前50个最优参数组合的列表，每个元素包含：
+            - params: 策略参数字典
+            - score_train: 综合评分 (0.7*验证集夏普比率 + 0.3*训练集夏普比率)
+            - train: 训练集表现指标
+            - valid: 验证集表现指标
+    
+    功能特点:
+        - 采用7:3时间切分策略（70%训练，30%验证）
+        - 自动计算参数搜索范围，支持缓存机制
+        - 多目标优化：夏普比率、最大回撤、交易次数、胜率
+        - 多进程并行计算，显著提升搜索效率
+        - 生成详细日志和CSV结果文件
+        - 支持硬性筛选条件，确保策略稳定性
+    
+    输出文件:
+        - 日志文件: stock_data/{symbol}/{symbol}_FindReturn_7_3.log
+        - CSV文件: pic/{symbol}_top50.csv
+    """
+    # 约束
+    MAX_MDD_TRAIN = (constraints or {}).get('MAX_MDD_TRAIN', 0.20)
+    MIN_TRADES_TRAIN = (constraints or {}).get('MIN_TRADES_TRAIN', 5)
+    rng = np.random.default_rng(seed)
+    
+    # 并行设置
+    if num_processes is None:
+        num_processes = multiprocessing.cpu_count()
+    print(f"使用 {num_processes} 个进程进行并行计算...")
+
+    # 加载数据
+    filepath = os.path.join(project_root, 'stock_data', f'{symbol}', f'{symbol}_Day.csv')
+    if not os.path.exists(filepath):
+        print(f"错误：数据文件不存在 -> {filepath}")
+        return
+    etf_data = load_etf_data(filepath)
+    if len(etf_data.index) < 100:
+        print("数据量过少，无法进行7:3切分与参数搜索。")
+        return
+
+    # 7:3 时间切分
+    full_index = etf_data.index
+    split_idx = int(len(full_index) * 0.7)
+    train_start = full_index[0].strftime('%Y-%m-%d')
+    train_end = full_index[split_idx - 1].strftime('%Y-%m-%d')
+    valid_start = full_index[split_idx].strftime('%Y-%m-%d')
+    valid_end = full_index[-1].strftime('%Y-%m-%d')
+    print(f"训练窗口: {train_start} ~ {train_end}；验证窗口: {valid_start} ~ {valid_end}")
+
+    # 阶段一范围：优先使用传入/缓存，否则自适应
+    ranges = phase1_cfg if phase1_cfg is not None else _load_phase1_ranges_from_cache(symbol)
+    if ranges is None:
+        vol, q70, q95 = _compute_basic_stats_for_symbol(etf_data)
+        ranges = _derive_phase1_ranges_from_stats(vol, q70, q95)
+        _save_phase1_ranges_to_cache(symbol, ranges)
+
+    def _rand_from_range(key):
+        lo, hi, typ, *rest = ranges[key]
+        if typ == 'int':
+            return int(rng.integers(int(lo), int(hi) + 1))
+        elif typ == 'float':
+            step = rest[0] if rest else None
+            if step is None:
+                return float(rng.uniform(lo, hi))
+            grid = np.round(rng.uniform(lo, hi) / step) * step
+            return float(grid)
+        else:
+            raise ValueError(f"未知范围类型: {typ}")
+
+    def sample_params_phase1():
+        p = {}
+        p['short_window'] = _rand_from_range('short_window')
+        p['long_window'] = _rand_from_range('long_window')
+        if p['long_window'] <= p['short_window']:
+            p['long_window'] = p['short_window'] + 1
+        p['volume_mavg_Value'] = _rand_from_range('volume_mavg_Value')
+        p['MaRateUp'] = float(np.round(_rand_from_range('MaRateUp'), 2))
+        p['VolumeSellRate'] = _rand_from_range('VolumeSellRate')
+        p['rsi_period'] = _rand_from_range('rsi_period')
+        p['rsiValueThd'] = _rand_from_range('rsiValueThd')
+        p['rsiRateUp'] = float(np.round(_rand_from_range('rsiRateUp'), 2))
+        p['divergence_threshold'] = float(np.round(_rand_from_range('divergence_threshold'), 3))
+        return p
+
+    def jitter(value, pct, is_int=False, floor=None, ceil=None, step=None):
+        low = value * (1 - pct)
+        high = value * (1 + pct)
+        if step is not None:
+            grid_val = np.round(rng.uniform(low, high) / step) * step
+            v = float(grid_val)
+        else:
+            v = float(rng.uniform(low, high))
+        if floor is not None:
+            v = max(v, floor)
+        if ceil is not None:
+            v = min(v, ceil)
+        if is_int:
+            return int(np.round(v))
+        return float(v)
+
+    def sample_params_phase2(base):
+        # 根据当前 ranges 收缩边界
+        sw_lo, sw_hi, _ = ranges['short_window'][:3]
+        lw_lo, lw_hi, _ = ranges['long_window'][:3]
+        vm_lo, vm_hi, _ = ranges['volume_mavg_Value'][:3]
+        mru_lo, mru_hi, _, mru_step = ranges['MaRateUp']
+        vsr_lo, vsr_hi, _ = ranges['VolumeSellRate'][:3]
+        rp_lo, rp_hi, _ = ranges['rsi_period'][:3]
+        rvt_lo, rvt_hi, _ = ranges['rsiValueThd'][:3]
+        rru_lo, rru_hi, _, rru_step = ranges['rsiRateUp']
+        dt_lo, dt_hi, _, dt_step = ranges['divergence_threshold']
+        q = {}
+        q['short_window'] = jitter(base['short_window'], 0.10, is_int=True, floor=int(sw_lo), ceil=int(sw_hi))
+        q['long_window'] = jitter(base['long_window'], 0.10, is_int=True, floor=int(lw_lo), ceil=int(lw_hi))
+        if q['long_window'] <= q['short_window']:
+            q['long_window'] = q['short_window'] + 1
+        q['volume_mavg_Value'] = jitter(base['volume_mavg_Value'], 0.10, is_int=True, floor=int(vm_lo), ceil=int(vm_hi))
+        q['MaRateUp'] = float(np.round(jitter(base['MaRateUp'], 0.10, floor=float(mru_lo), ceil=float(mru_hi), step=float(mru_step)), 2))
+        q['VolumeSellRate'] = jitter(base['VolumeSellRate'], 0.10, is_int=True, floor=int(vsr_lo), ceil=int(vsr_hi))
+        q['rsi_period'] = jitter(base['rsi_period'], 0.10, is_int=True, floor=int(rp_lo), ceil=int(rp_hi))
+        q['rsiValueThd'] = jitter(base['rsiValueThd'], 0.10, is_int=True, floor=int(rvt_lo), ceil=int(rvt_hi))
+        q['rsiRateUp'] = float(np.round(jitter(base['rsiRateUp'], 0.10, floor=float(rru_lo), ceil=float(rru_hi), step=float(rru_step)), 2))
+        q['divergence_threshold'] = float(np.round(jitter(base['divergence_threshold'], 0.10, floor=float(dt_lo), ceil=float(dt_hi), step=float(dt_step)), 3))
+        return q
+
+
+
+    # 阶段一：并行随机搜索
+    NUM_PHASE1 = 2000
+    print(f"阶段一随机搜索开始，总计 {NUM_PHASE1} 组...")
+    
+    # 预生成所有阶段一参数
+    phase1_params = [sample_params_phase1() for _ in range(NUM_PHASE1)]
+    
+    # 准备任务参数
+    phase1_tasks = [
+        (params, etf_data, symbol, train_start, train_end, valid_start, valid_end, MAX_MDD_TRAIN, MIN_TRADES_TRAIN)
+        for params in phase1_params
+    ]
+    
+    # 并行执行阶段一
+    stage1_results = []
+    t0 = time.time()
+    step1 = max(1, NUM_PHASE1 // 20)
+    completed = 0
+    
+    with multiprocessing.Pool(processes=num_processes) as pool:
+        for result in pool.imap_unordered(_find_best_params_worker, phase1_tasks):
+            if result is not None:
+                stage1_results.append(result)
+            completed += 1
+            
+            if completed % step1 == 0 or completed == NUM_PHASE1:
+                elapsed = time.time() - t0
+                per_iter = elapsed / completed
+                remain = per_iter * (NUM_PHASE1 - completed)
+                print(f"阶段一进度: {completed}/{NUM_PHASE1} ({completed/NUM_PHASE1*100:.1f}%)，已用时 {elapsed/60:.1f} 分钟，预计剩余 {max(remain,0)/60:.1f} 分钟")
+                sys.stdout.flush()
+    
+    if not stage1_results:
+        print("阶段一无有效结果（受MDD或交易数限制）。")
+        return
+
+    stage1_results.sort(key=lambda r: (
+        r['score_train'],
+        -abs(r['train']['max_drawdown']),
+        r['train']['trades'],
+        r['train']['win_rate']
+    ), reverse=True)
+    top_bases = stage1_results[:50]
+
+    # 阶段二：并行局部细化
+    NUM_PHASE2 = 1000
+    print(f"阶段二局部细化开始，总计 {NUM_PHASE2} 组...")
+    
+    # 预生成所有阶段二参数
+    phase2_params = []
+    for _ in range(NUM_PHASE2):
+        base = top_bases[int(rng.integers(0, len(top_bases)))]
+        params2 = sample_params_phase2(base['params'])
+        phase2_params.append(params2)
+    
+    # 准备任务参数
+    phase2_tasks = [
+        (params, etf_data, symbol, train_start, train_end, valid_start, valid_end, MAX_MDD_TRAIN, MIN_TRADES_TRAIN)
+        for params in phase2_params
+    ]
+    
+    # 并行执行阶段二
+    stage2_results = []
+    t1 = time.time()
+    step2 = max(1, NUM_PHASE2 // 20)
+    completed = 0
+    
+    with multiprocessing.Pool(processes=num_processes) as pool:
+        for result in pool.imap_unordered(_find_best_params_worker, phase2_tasks):
+            if result is not None:
+                stage2_results.append(result)
+            completed += 1
+            
+            if completed % step2 == 0 or completed == NUM_PHASE2:
+                elapsed2 = time.time() - t1
+                per_iter2 = elapsed2 / completed
+                remain2 = per_iter2 * (NUM_PHASE2 - completed)
+                print(f"阶段二进度: {completed}/{NUM_PHASE2} ({completed/NUM_PHASE2*100:.1f}%)，已用时 {elapsed2/60:.1f} 分钟，预计剩余 {max(remain2,0)/60:.1f} 分钟")
+                sys.stdout.flush()
+
+    # 合并候选
+    all_candidates = top_bases + stage2_results
+    all_candidates.sort(key=lambda r: (
+        r['score_train'],
+        -abs(r['train']['max_drawdown']),
+        r['train']['trades'],
+        r['train']['win_rate']
+    ), reverse=True)
+    final_top50 = all_candidates[:50]
+
+    # 输出日志与CSV
+    stock_data_folder = os.path.dirname(filepath)
+    log_path = os.path.join(stock_data_folder, f'{symbol}_FindReturn_7_3.log')
+    try:
+        with open(log_path, 'w', encoding='utf-8') as f:
+            f.write(f"Top 50 参数组合（{symbol}，7:3 切分）\n")
+            f.write("排序: Score = 0.7*Sharpe_valid + 0.3*Sharpe_train；Tie: 低MDD -> 高交易数 -> 高胜率\n")
+            f.write(f"硬性筛选: MDD_train ≤ {MAX_MDD_TRAIN*100}%，min_trades_train ≥ {MIN_TRADES_TRAIN}\n")
+            f.write("="*60 + "\n")
+            for i, r in enumerate(final_top50, start=1):
+                tr = r['train']; va = r['valid']
+                risk_note = []
+                if abs(va['max_drawdown']) > 0.12:
+                    risk_note.append("验证MDD>12%")
+                if va['trades'] < 10:
+                    risk_note.append("验证交易数<10")
+                risk_str = ("；".join(risk_note)) if risk_note else ""
+                f.write(f"Rank {i}: Score={r['score_train']:.4f} {(' ['+risk_str+']') if risk_str else ''}\n")
+                f.write(f"  参数: {json.dumps(r['params'], ensure_ascii=False, cls=NpEncoder)}\n")
+                f.write(f"  Train: Sharpe={tr['sharpe_ratio']:.3f}, AnnRet={tr['annualized_return']*100:.2f}%, MaxDD={tr['max_drawdown']*100:.2f}%, Trades={tr['trades']}, WinRate={tr['win_rate']*100:.1f}%\n")
+                f.write(f"  Valid: Sharpe={va['sharpe_ratio']:.3f}, AnnRet={va['annualized_return']*100:.2f}%, MaxDD={va['max_drawdown']*100:.2f}%, Trades={va['trades']}, WinRate={va['win_rate']*100:.1f}%\n")
+                f.write("-"*40 + "\n")
+        print(f"Top 50 日志已写入: {log_path}")
+    except Exception as e:
+        print(f"写入日志失败: {e}")
+
+    csv_path = os.path.join(os.path.dirname(os.path.dirname(filepath)), 'pic', f'{symbol}_top50.csv')
+    try:
+        os.makedirs(os.path.dirname(csv_path), exist_ok=True)
+        rows = []
+        for r in final_top50:
+            row = {
+                'short_window': r['params']['short_window'],
+                'long_window': r['params']['long_window'],
+                'volume_mavg_Value': r['params']['volume_mavg_Value'],
+                'MaRateUp': r['params']['MaRateUp'],
+                'VolumeSellRate': r['params']['VolumeSellRate'],
+                'rsi_period': r['params']['rsi_period'],
+                'rsiValueThd': r['params']['rsiValueThd'],
+                'rsiRateUp': r['params']['rsiRateUp'],
+                'divergence_threshold': r['params']['divergence_threshold'],
+                'Train_Sharpe': r['train']['sharpe_ratio'],
+                'Train_AnnRet': r['train']['annualized_return'],
+                'Train_MaxDD': r['train']['max_drawdown'],
+                'Train_Trades': r['train']['trades'],
+                'Train_WinRate': r['train']['win_rate'],
+                'Valid_Sharpe': r['valid']['sharpe_ratio'],
+                'Valid_AnnRet': r['valid']['annualized_return'],
+                'Valid_MaxDD': r['valid']['max_drawdown'],
+                'Valid_Trades': r['valid']['trades'],
+                'Valid_WinRate': r['valid']['win_rate'],
+                'Score_train': r['score_train']
+            }
+            rows.append(row)
+        pd.DataFrame(rows).to_csv(csv_path, index=False)
+        print(f"Top 50 CSV 已生成: {csv_path}")
+    except Exception as e:
+        print(f"写入CSV失败: {e}")
+
+    return final_top50
 
 def testAuto(symbol):
 
@@ -1414,7 +2262,7 @@ if __name__ == "__main__":
 
    #testAuto(symbol = "159915")
    #testAuto(symbol = "588180")
-   #ganggu30ETFParaFind()
+   ganggu30ETFParaFind()
    #testAuto(symbol = "513160") # 港股
 
    #testAuto(symbol = "513160") # 港股
@@ -1422,6 +2270,9 @@ if __name__ == "__main__":
    #gangguxiaofeiETFParaFind()
    #testAuto(symbol = "159843") # 消费
 
-   #gangguxiaofeiETFParaFind511090()
-   testAuto(symbol = "511090") # 国债
+   #find_best_params("159843")
+   #find_best_params("511090")
+
+   #testAuto(symbol = "511090") # 国债
+   #testAuto(symbol = "159843") # 消费
    

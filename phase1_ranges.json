@@ -1,0 +1,52 @@
+{
+  "511090": {
+    "short_window": [
+      2,
+      5,
+      "int"
+    ],
+    "long_window": [
+      10,
+      18,
+      "int"
+    ],
+    "volume_mavg_Value": [
+      5,
+      9,
+      "int"
+    ],
+    "MaRateUp": [
+      0.9,
+      1.15,
+      "float",
+      0.01
+    ],
+    "VolumeSellRate": [
+      3,
+      6,
+      "int"
+    ],
+    "rsi_period": [
+      10,
+      16,
+      "int"
+    ],
+    "rsiValueThd": [
+      27,
+      36,
+      "int"
+    ],
+    "rsiRateUp": [
+      1.0,
+      1.5,
+      "float",
+      0.02
+    ],
+    "divergence_threshold": [
+      0.005,
+      0.0129459956878091,
+      "float",
+      0.001
+    ]
+  }
+}
