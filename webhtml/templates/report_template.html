@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>金融行情监控仪表盘 (静态版)</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body { font-family: 'Inter', 'Helvetica Neue', 'Helvetica', 'Arial', 'sans-serif'; }
+        .positive { color: #ef4444; }
+        .negative { color: #22c55e; }
+        .card { background-color: white; border-radius: 0.75rem; padding: 1.5rem; box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1); }
+    </style>
+</head>
+<body class="bg-slate-100 text-slate-800">
+
+    <div class="container mx-auto p-4 md:p-6 lg:p-8">
+        <header class="text-center mb-8">
+            <h1 class="text-3xl md:text-4xl font-bold text-slate-900">金融行情监控仪表盘</h1>
+            <p id="reportDate" class="text-slate-500 mt-2 text-lg">{{ report_date }}</p>
+        </header>
+
+        <section class="mb-8">
+            <div class="card">
+                <h2 class="text-2xl font-bold mb-4 text-slate-900">摘要与核心看板</h2>
+                <div class="border-l-4 border-sky-500 pl-4 mb-6">
+                     <h3 class="font-semibold text-slate-900 mb-2">核心结论 (AI-Generated)</h3>
+                     <p class="text-slate-600 italic">{{ ai_summary }}</p>
+                </div>
+                <div>
+                    <h3 class="font-semibold text-slate-900 mb-3">A股市场温度</h3>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left text-sm md:text-base">
+                            <thead class="bg-slate-200 text-slate-600 uppercase">
+                                <tr>
+                                    <th class="p-3">指数名称</th>
+                                    <th class="p-3 text-right">收盘点位</th>
+                                    <th class="p-3 text-right">当日涨跌</th>
+                                    <th class="p-3 text-right">成交额(亿)</th>
+                                    <th class="p-3 text-center">A股涨跌比</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-100">
+                                {% for idx in indexes %}
+                                <tr>
+                                    <td class="p-3 font-semibold">{{ idx.name }}</td>
+                                    <td class="p-3 text-right">{{ idx.close }}</td>
+                                    <td class="p-3 text-right font-semibold {{ idx.change_class }}">{{ idx.change_pct_str }}</td>
+                                    <td class="p-3 text-right">{{ idx.turnover_billion }}</td>
+                                    {% if loop.first %}
+                                    <td class="p-3 text-center font-bold {{ up_down.class }}" rowspan="{{ indexes | length }}">{{ up_down.up }} : {{ up_down.down }}<br><span class="text-sm text-slate-500 font-normal">({{ up_down.label }})</span></td>
+                                    {% endif %}
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section class="mb-8">
+            <div class="card">
+                <h2 class="text-2xl font-bold mb-6 text-slate-900">A股核心圈深度分析</h2>
+
+                <div class="mb-8">
+                    <h3 class="font-semibold text-slate-900 mb-3 text-xl">市场风格与规模</h3>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left text-sm md:text-base">
+                            <thead class="bg-slate-200 text-slate-600 uppercase">
+                                <tr>
+                                    <th class="p-3">分类</th>
+                                    <th class="p-3">监控ETF</th>
+                                    <th class="p-3">代码</th>
+                                    <th class="p-3 text-right">当日涨跌</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-100">
+                                {% for group in styles_groups %}
+                                    {% for item in group.items %}
+                                    <tr class="{{ item.row_class }}">
+                                        {% if loop.first %}
+                                        <td class="p-3 font-semibold" rowspan="{{ group.items | length }}">{{ group.category }}</td>
+                                        {% endif %}
+                                        <td class="p-3">{{ item.name }}</td>
+                                        <td class="p-3 text-slate-500">{{ item.code }}</td>
+                                        <td class="p-3 text-right font-semibold {{ item.change_class }}">{{ item.change_pct_str }}</td>
+                                    </tr>
+                                    {% endfor %}
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <div class="mb-8">
+                    <h3 class="font-semibold text-slate-900 mb-3 text-xl">行业与主题板块 (按涨幅排序)</h3>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left text-sm md:text-base">
+                            <thead class="bg-slate-200 text-slate-600 uppercase">
+                                <tr>
+                                    <th class="p-3">监控ETF</th>
+                                    <th class="p-3 text-right">当日涨跌</th>
+                                    <th class="p-3">核心成分股/龙头</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-100">
+                                {% for s in sectors %}
+                                <tr class="{{ s.row_class }}">
+                                    <td class="p-3 font-semibold {{ s.name_text_class }}">{{ s.etf_name }}</td>
+                                    <td class="p-3 text-right font-bold {{ s.change_class }}">{{ s.change_pct_str }}</td>
+                                    <td class="p-3 text-sm">
+                                        {% for l in s.leaders %}
+                                            {{ l.name }}: <span class="{{ l.change_class }} {{ l.bold }}">{{ l.change_pct_str }}</span>{% if not loop.last %}, {% endif %}
+                                        {% endfor %}
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <div>
+                    <h3 class="font-semibold text-slate-900 mb-3 text-xl">风险偏好</h3>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left text-sm md:text-base">
+                            <thead class="bg-slate-200 text-slate-600 uppercase">
+                                <tr>
+                                    <th class="p-3">类别</th>
+                                    <th class="p-3">监控对象</th>
+                                    <th class="p-3 text-right">当日涨跌/状态</th>
+                                    <th class="p-3">解读</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-100">
+                                {% for r in risks %}
+                                <tr class="{{ r.row_class }}">
+                                    <td class="p-3 text-slate-600">{{ r.category }}</td>
+                                    <td class="p-3 font-semibold">{{ r.name }}</td>
+                                    <td class="p-3 text-right font-semibold {{ r.change_class }}">{{ r.value_or_change_str }}</td>
+                                    <td class="p-3 text-sm text-slate-600">{{ r.interpretation }}</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section>
+            <div class="card">
+                <h2 class="text-2xl font-bold mb-6 text-slate-900">全球环境与关联市场</h2>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left text-sm md:text-base">
+                        <thead class="bg-slate-200 text-slate-600 uppercase">
+                            <tr>
+                                <th class="p-3">类别</th>
+                                <th class="p-3">指标</th>
+                                <th class="p-3 text-right">状态/涨跌幅</th>
+                                <th class="p-3">解读</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-slate-100">
+                            {% for group in globals_groups %}
+                                {% for item in group.items %}
+                                <tr class="{{ item.row_class }}">
+                                    {% if loop.first %}
+                                    <td class="p-3 font-semibold" rowspan="{{ group.items | length }}">{{ group.category }}</td>
+                                    {% endif %}
+                                    <td class="p-3">{{ item.indicator }}</td>
+                                    <td class="p-3 text-right font-semibold {{ item.change_class }}">{{ item.value_or_change_str }}</td>
+                                    <td class="p-3 text-sm text-slate-600">{{ item.interpretation }}</td>
+                                </tr>
+                                {% endfor %}
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+
+        <footer class="text-center mt-12 text-slate-500">
+            <p>&copy; <span id="currentYear">{{ current_year }}</span> 金融行情监控系统</p>
+        </footer>
+    </div>
+</body>
+</html>
+
+

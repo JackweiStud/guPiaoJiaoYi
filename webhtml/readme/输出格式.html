@@ -1,0 +1,348 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>金融行情监控仪表盘 (静态版)</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Chosen Palette: Warm Neutrals (bg-slate-50, text-slate-700) with Chinese market colors (Red: #ef4444 for Up, Green: #22c55e for Down) and a calming Blue (#3b82f6) for accents. -->
+    <style>
+        body { font-family: 'Inter', 'Helvetica Neue', 'Helvetica', 'Arial', 'sans-serif'; }
+        .positive { color: #ef4444; }
+        .negative { color: #22c55e; }
+        .card { background-color: white; border-radius: 0.75rem; padding: 1.5rem; box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1); }
+    </style>
+</head>
+<body class="bg-slate-100 text-slate-800">
+
+    <div class="container mx-auto p-4 md:p-6 lg:p-8">
+        
+        <header class="text-center mb-8">
+            <h1 class="text-3xl md:text-4xl font-bold text-slate-900">金融行情监控仪表盘</h1>
+            <p id="reportDate" class="text-slate-500 mt-2 text-lg">2025-09-02</p>
+        </header>
+
+        <!-- 摘要与核心看板 -->
+        <section class="mb-8">
+            <div class="card">
+                <h2 class="text-2xl font-bold mb-4 text-slate-900">摘要与核心看板</h2>
+                <div class="border-l-4 border-sky-500 pl-4 mb-6">
+                     <h3 class="font-semibold text-slate-900 mb-2">核心结论 (AI-Generated)</h3>
+                     <p class="text-slate-600 italic">
+                        在美股科技股隔夜上涨的积极氛围下，今日A股市场高开高走，呈现放量普涨格局。市场主线清晰，<b>券商</b>板块放量领涨超5%，点燃市场情绪，其龙头股<b>中信证券</b>涨超7%；<b>芯片、人工智能</b>等科技板块与港股恒生科技指数形成共振，表现强势。市场风格上，大盘成长（科创50）与大盘价值（上证50）均表现优于中小盘股。人民币汇率走强亦为外资流入提供支撑。总体来看，市场风险偏好显著提升，赚钱效应扩散。
+                     </p>
+                </div>
+                <div>
+                    <h3 class="font-semibold text-slate-900 mb-3">A股市场温度</h3>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left text-sm md:text-base">
+                            <thead class="bg-slate-200 text-slate-600 uppercase">
+                                <tr>
+                                    <th class="p-3">指数名称</th>
+                                    <th class="p-3 text-right">收盘点位</th>
+                                    <th class="p-3 text-right">当日涨跌</th>
+                                    <th class="p-3 text-right">成交额(亿)</th>
+                                    <th class="p-3 text-center">A股涨跌比</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-100">
+                                <tr>
+                                    <td class="p-3 font-semibold">上证指数</td>
+                                    <td class="p-3 text-right">3100.50</td>
+                                    <td class="p-3 text-right positive font-semibold">+1.20%</td>
+                                    <td class="p-3 text-right">4500</td>
+                                    <td class="p-3 text-center font-bold positive" rowspan="3">3500 : 1500<br><span class="text-sm text-slate-500 font-normal">(普涨)</span></td>
+                                </tr>
+                                <tr>
+                                    <td class="p-3 font-semibold">创业板指</td>
+                                    <td class="p-3 text-right">2250.10</td>
+                                    <td class="p-3 text-right negative font-semibold">-0.50%</td>
+                                    <td class="p-3 text-right">2300</td>
+                                </tr>
+                                <tr>
+                                    <td class="p-3 font-semibold">科创50指</td>
+                                    <td class="p-3 text-right">1050.80</td>
+                                    <td class="p-3 text-right positive font-semibold">+2.80%</td>
+                                    <td class="p-3 text-right">1200</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- A股核心圈深度分析 -->
+        <section class="mb-8">
+            <div class="card">
+                <h2 class="text-2xl font-bold mb-6 text-slate-900">A股核心圈深度分析</h2>
+                
+                <div class="mb-8">
+                    <h3 class="font-semibold text-slate-900 mb-3 text-xl">市场风格与规模</h3>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left text-sm md:text-base">
+                            <thead class="bg-slate-200 text-slate-600 uppercase">
+                                <tr>
+                                    <th class="p-3">分类</th>
+                                    <th class="p-3">监控ETF</th>
+                                    <th class="p-3">代码</th>
+                                    <th class="p-3 text-right">当日涨跌</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-100">
+                                <tr class="bg-slate-50">
+                                    <td class="p-3 font-semibold" rowspan="4">大规模/价值</td>
+                                    <td class="p-3">上证50ETF</td>
+                                    <td class="p-3 text-slate-500">510050</td>
+                                    <td class="p-3 text-right positive font-semibold">+1.5%</td>
+                                </tr>
+                                <tr class="bg-slate-50">
+                                    <td class="p-3">沪深300ETF</td>
+                                    <td class="p-3 text-slate-500">510300</td>
+                                    <td class="p-3 text-right positive font-semibold">+1.2%</td>
+                                </tr>
+                                <tr class="bg-slate-50">
+                                    <td class="p-3">红利ETF</td>
+                                    <td class="p-3 text-slate-500">510880</td>
+                                    <td class="p-3 text-right positive font-semibold">+0.8%</td>
+                                </tr>
+                                 <tr class="bg-slate-50">
+                                    <td class="p-3">科创50ETF</td>
+                                    <td class="p-3 text-slate-500">588000</td>
+                                    <td class="p-3 text-right positive font-semibold">+2.8%</td>
+                                </tr>
+                                <tr>
+                                    <td class="p-3 font-semibold" rowspan="3">中小规模/成长</td>
+                                    <td class="p-3">中证500ETF</td>
+                                    <td class="p-3 text-slate-500">510500</td>
+                                    <td class="p-3 text-right positive font-semibold">+0.5%</td>
+                                </tr>
+                                <tr>
+                                    <td class="p-3">中证1000ETF</td>
+                                    <td class="p-3 text-slate-500">159845</td>
+                                    <td class="p-3 text-right negative font-semibold">-0.2%</td>
+                                </tr>
+                                <tr>
+                                    <td class="p-3">科创100ETF</td>
+                                    <td class="p-3 text-slate-500">588190</td>
+                                    <td class="p-3 text-right positive font-semibold">+1.9%</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <div class="mb-8">
+                    <h3 class="font-semibold text-slate-900 mb-3 text-xl">行业与主题板块 (按涨幅排序)</h3>
+                     <div class="overflow-x-auto">
+                        <table class="w-full text-left text-sm md:text-base">
+                            <thead class="bg-slate-200 text-slate-600 uppercase">
+                                <tr>
+                                    <th class="p-3">监控ETF</th>
+                                    <th class="p-3 text-right">当日涨跌</th>
+                                    <th class="p-3">核心成分股/龙头</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-100">
+                                <!-- Top Performers -->
+                                <tr class="bg-red-50">
+                                    <td class="p-3 font-semibold text-red-800">券商ETF</td>
+                                    <td class="p-3 text-right positive font-bold">+5.2%</td>
+                                    <td class="p-3 text-sm">中信证券: <span class="positive font-bold">+7.12%</span>, 东方财富: <span class="positive">+6.53%</span></td>
+                                </tr>
+                                <tr class="bg-red-50">
+                                    <td class="p-3 font-semibold text-red-800">芯片ETF</td>
+                                    <td class="p-3 text-right positive font-bold">+4.1%</td>
+                                    <td class="p-3 text-sm">中芯国际: <span class="positive">+4.51%</span>, 北方华创: <span class="positive">+5.23%</span></td>
+                                </tr>
+                                <tr class="bg-red-50">
+                                    <td class="p-3 font-semibold text-red-800">人工智能AI ETF</td>
+                                    <td class="p-3 text-right positive font-bold">+3.5%</td>
+                                    <td class="p-3 text-sm">科大讯飞: <span class="positive">+5.89%</span>, 浪潮信息: <span class="positive">+6.14%</span></td>
+                                </tr>
+                                <!-- Mid-level Performers -->
+                                <tr>
+                                    <td class="p-3 font-semibold">软件ETF</td>
+                                    <td class="p-3 text-right positive font-semibold">+2.8%</td>
+                                    <td class="p-3 text-sm">金山办公: <span class="positive">+4.05%</span></td>
+                                </tr>
+                                <tr>
+                                    <td class="p-3 font-semibold">新能源车ETF</td>
+                                    <td class="p-3 text-right positive font-semibold">+1.2%</td>
+                                    <td class="p-3 text-sm">宁德时代: <span class="positive">+1.88%</span>, 比亚迪: <span class="positive">+2.15%</span></td>
+                                </tr>
+                                <tr>
+                                    <td class="p-3 font-semibold">保险主题ETF</td>
+                                    <td class="p-3 text-right positive font-semibold">+1.1%</td>
+                                    <td class="p-3 text-sm">中国平安: <span class="positive">+1.5%</span></td>
+                                </tr>
+                                <tr>
+                                    <td class="p-3 font-semibold">银行ETF</td>
+                                    <td class="p-3 text-right positive font-semibold">+0.9%</td>
+                                    <td class="p-3 text-sm">招商银行: <span class="positive">+1.2%</span></td>
+                                </tr>
+                                 <tr>
+                                    <td class="p-3 font-semibold">有色金属ETF</td>
+                                    <td class="p-3 text-right positive font-semibold">+0.7%</td>
+                                    <td class="p-3 text-sm">紫金矿业: <span class="positive">+1.3%</span></td>
+                                </tr>
+                                <!-- Bottom Performers -->
+                                 <tr>
+                                    <td class="p-3 font-semibold">煤炭ETF</td>
+                                    <td class="p-3 text-right negative font-semibold">-0.3%</td>
+                                    <td class="p-3 text-sm">中国神华: <span class="positive">+1.01%</span></td>
+                                </tr>
+                                <tr>
+                                    <td class="p-3 font-semibold">消费ETF</td>
+                                    <td class="p-3 text-right negative font-semibold">-0.8%</td>
+                                    <td class="p-3 text-sm">贵州茅台: <span class="positive">+2.03%</span></td>
+                                </tr>
+                                <tr class="bg-green-50">
+                                    <td class="p-3 font-semibold text-green-800">食品饮料ETF</td>
+                                    <td class="p-3 text-right negative font-bold">-1.5%</td>
+                                    <td class="p-3 text-sm">五粮液: <span class="negative">-1.2%</span>, 泸州老窖: <span class="negative">-1.8%</span></td>
+                                </tr>
+                                <tr class="bg-green-50">
+                                    <td class="p-3 font-semibold text-green-800">医药ETF</td>
+                                    <td class="p-3 text-right negative font-bold">-1.9%</td>
+                                    <td class="p-3 text-sm">恒瑞医药: <span class="negative">-3.05%</span>, 药明康德: <span class="negative">-2.81%</span></td>
+                                </tr>
+                                <tr class="bg-green-50">
+                                    <td class="p-3 font-semibold text-green-800">医疗ETF</td>
+                                    <td class="p-3 text-right negative font-bold">-2.1%</td>
+                                    <td class="p-3 text-sm">迈瑞医疗: <span class="negative">-2.5%</span>, 爱尔眼科: <span class="negative">-3.1%</span></td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <div>
+                    <h3 class="font-semibold text-slate-900 mb-3 text-xl">风险偏好</h3>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left text-sm md:text-base">
+                             <thead class="bg-slate-200 text-slate-600 uppercase">
+                                <tr>
+                                    <th class="p-3">类别</th>
+                                    <th class="p-3">监控对象</th>
+                                    <th class="p-3 text-right">当日涨跌/状态</th>
+                                    <th class="p-3">解读</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-100">
+                                <tr>
+                                    <td class="p-3 text-slate-600">国内避险</td>
+                                    <td class="p-3 font-semibold">黄金ETF</td>
+                                    <td class="p-3 text-right negative font-semibold">-0.5%</td>
+                                    <td class="p-3 text-sm text-slate-600">市场风险偏好提升</td>
+                                </tr>
+                                <tr>
+                                    <td class="p-3 text-slate-600">国内安全</td>
+                                    <td class="p-3 font-semibold">30年国债ETF</td>
+                                    <td class="p-3 text-right negative font-semibold">-0.1%</td>
+                                    <td class="p-3 text-sm text-slate-600">资金流向风险资产</td>
+                                </tr>
+                                <tr class="bg-slate-50">
+                                    <td class="p-3 text-slate-600">全球避险</td>
+                                    <td class="p-3 font-semibold">COMEX黄金</td>
+                                    <td class="p-3 text-right negative font-semibold">-0.8%</td>
+                                    <td class="p-3 text-sm text-slate-600">避险情绪降温</td>
+                                </tr>
+                                <tr class="bg-slate-50">
+                                    <td class="p-3 text-slate-600">全球风险锚</td>
+                                    <td class="p-3 font-semibold">10年期美债收益率</td>
+                                    <td class="p-3 text-right positive font-semibold">↑ 4.25%</td>
+                                    <td class="p-3 text-sm text-slate-600">对高估值成长股构成潜在压力</td>
+                                </tr>
+                                <tr class="bg-slate-50">
+                                    <td class="p-3 text-slate-600">做多A股</td>
+                                    <td class="p-3 font-semibold">YINN富时3倍做多中国</td>
+                                    <td class="p-3 text-right positive font-semibold"> 41.25%</td>
+                                    <td class="p-3 text-sm text-slate-600">外资看多看空</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- 全球环境与关联市场 -->
+        <section>
+             <div class="card">
+                <h2 class="text-2xl font-bold mb-6 text-slate-900">全球环境与关联市场</h2>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left text-sm md:text-base">
+                        <thead class="bg-slate-200 text-slate-600 uppercase">
+                            <tr>
+                                <th class="p-3">类别</th>
+                                <th class="p-3">指标</th>
+                                <th class="p-3 text-right">状态/涨跌幅</th>
+                                <th class="p-3">解读</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-slate-100">
+                            <tr class="bg-slate-50">
+                                <td class="p-3 font-semibold" rowspan="2">关联圈 (香港)</td>
+                                <td class="p-3">恒生指数</td>
+                                <td class="p-3 text-right positive font-semibold">+1.5%</td>
+                                <td class="p-3 text-sm text-slate-600">市场情绪联动</td>
+                            </tr>
+                            <tr class="bg-slate-50">
+                                <td class="p-3">恒生科技指数</td>
+                                <td class="p-3 text-right positive font-semibold">+2.5%</td>
+                                <td class="p-3 text-sm text-slate-600">与A股科技板块形成共振</td>
+                            </tr>
+                             <tr>
+                                <td class="p-3 font-semibold" rowspan="4">环境圈 (美股)</td>
+                                <td class="p-3">标普500</td>
+                                <td class="p-3 text-right positive font-semibold">+1.1%</td>
+                                <td class="p-3 text-sm text-slate-600">全球风险偏好向好</td>
+                            </tr>
+                            <tr>
+                                <td class="p-3">纳斯达克100</td>
+                                <td class="p-3 text-right positive font-semibold">+1.8%</td>
+                                <td class="p-3 text-sm text-slate-600">利好A股科技股开盘</td>
+                            </tr>
+                            <tr>
+                                <td class="p-3">英伟达(NVDA)</td>
+                                <td class="p-3 text-right positive font-semibold">+4.5%</td>
+                                <td class="p-3 text-sm text-slate-600">AI与半导体情绪高涨</td>
+                            </tr>
+                            <tr>
+                                <td class="p-3">金龙中国指数</td>
+                                <td class="p-3 text-right positive font-semibold">+3.0%</td>
+                                <td class="p-3 text-sm text-slate-600">提振中概股相关板块情绪</td>
+                            </tr>
+                            <tr class="bg-slate-50">
+                                <td class="p-3 font-semibold">环境圈 (其他)</td>
+                                <td class="p-3">美元/离岸CNH</td>
+                                <td class="p-3 text-right negative font-semibold">↓ 7.25 (-0.3%)</td>
+                                <td class="p-3 text-sm text-slate-600">人民币升值，利好外资流入</td>
+                            </tr>
+                            <tr>
+                                <td class="p-3 font-semibold" rowspan="2">环境圈 (加密货币)</td>
+                                <td class="p-3">比特币 (BTC)</td>
+                                <td class="p-3 text-right positive font-semibold">+3.5%</td>
+                                <td class="p-3 text-sm text-slate-600">全球投机情绪回暖</td>
+                            </tr>
+                            <tr>
+                                <td class="p-3">以太坊 (ETH)</td>
+                                <td class="p-3 text-right positive font-semibold">+4.2%</td>
+                                <td class="p-3 text-sm text-slate-600">高风险偏好资产表现强势</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+             </div>
+        </section>
+
+        <footer class="text-center mt-12 text-slate-500">
+            <p>&copy; <span id="currentYear">2025</span> 金融行情监控系统</p>
+        </footer>
+    </div>
+</body>
+</html>
+
+
+
