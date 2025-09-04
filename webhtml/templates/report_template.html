@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>金融行情每日早晚报道</title>
+    <title>淮舟金融科技全球金融行情监控仪表盘(静态版)</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
         body { font-family: 'Inter', 'Helvetica Neue', 'Helvetica', 'Arial', 'sans-serif'; }
@@ -16,7 +16,7 @@
 
     <div class="container mx-auto p-4 md:p-6 lg:p-8">
         <header class="text-center mb-8">
-            <h1 class="text-3xl md:text-4xl font-bold text-slate-900">金融行情监控仪表盘</h1>
+            <h1 class="text-3xl md:text-4xl font-bold text-slate-900">淮舟金融科技全球金融行情监控仪表盘</h1>
             <p id="reportDate" class="text-slate-500 mt-2 text-lg">{{ report_date }}</p>
         </header>
 
@@ -24,7 +24,7 @@
             <div class="card">
                 <h2 class="text-2xl font-bold mb-4 text-slate-900">摘要与核心看板</h2>
                 <div class="border-l-4 border-sky-500 pl-4 mb-6">
-                     <h3 class="font-semibold text-slate-900 mb-2">核心结论 (AI-Generated)</h3>
+                     <h3 class="font-semibold text-slate-900 mb-2">今日行情点评 (Generated)</h3>
                      <p class="text-slate-600 italic">{{ ai_summary }}</p>
                 </div>
                 <div>
@@ -48,7 +48,7 @@
                                     <td class="p-3 text-right font-semibold {{ idx.change_class }}">{{ idx.change_pct_str }}</td>
                                     <td class="p-3 text-right">{{ idx.turnover_billion }}</td>
                                     {% if loop.first %}
-                                    <td class="p-3 text-center font-bold {{ up_down.class }}" rowspan="{{ indexes | length }}">{{ up_down.up }} : {{ up_down.down }}<br><span class="text-sm text-slate-500 font-normal">({{ up_down.label }})</span><br><span class="text-xs text-slate-400 font-normal">活跃度: {{ up_down.activityPct }}</span></td>
+                                    <td class="p-3 text-center font-bold {{ up_down.class }}" rowspan="{{ indexes | length }}">{{ up_down.up }} : {{ up_down.down }}<br><span class="text-sm text-slate-500 font-normal">({{ up_down.label }})</span><br><span class="text-xs text-slate-400 font-normal">涨跌比: {{ up_down.activityPct }}</span></td>
                                     {% endif %}
                                 </tr>
                                 {% endfor %}
@@ -182,7 +182,7 @@
         </section>
 
         <footer class="text-center mt-12 text-slate-500">
-            <p>&copy; <span id="currentYear">{{ current_year }}</span> 金融行情监控系统</p>
+            <p>&copy; <span id="currentYear">{{ current_year }}</span> 金融监控系统</p>
         </footer>
     </div>
 </body>

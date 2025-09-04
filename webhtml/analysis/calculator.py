@@ -94,8 +94,8 @@ def build_report_view(raw: Dict[str, Any]) -> Dict[str, Any]:
     # 行业与主题 - 排序并标 Top/Bottom 5
     sectors = sorted(raw.get("sectors", []), key=lambda x: x.get("change_pct", 0), reverse=True)
     n = len(sectors)
-    top_k = min(5, n)
-    bottom_k = min(5, n)
+    top_k = min(3, n)
+    bottom_k = min(3, n)
     view_sectors = []
     for idx, s in enumerate(sectors):
         if idx < top_k:

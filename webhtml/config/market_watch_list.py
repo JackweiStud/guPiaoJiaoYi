@@ -38,7 +38,7 @@ SECTORS = [
 # 风险偏好
 RISKS = [
     {"category": "国内避险", "name": "黄金ETF", "code": "518880"},
-    {"category": "国内安全", "name": "30年国债ETF", "code": "511260"},
+    {"category": "国内安全", "name": "30年国债ETF", "code": "511090"},
     {"category": "全球避险", "name": "COMEX黄金", "code": "GLOBAL_COMEX_GOLD"},
     {"category": "全球风险锚", "name": "10年期美债收益率", "code": "US10Y"},
     {"category": "做多A股", "name": "YINN富时3倍做多中国", "code": "YINN"},

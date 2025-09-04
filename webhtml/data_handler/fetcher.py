@@ -98,7 +98,7 @@ def _mock_raw_data() -> Dict[str, Any]:
         ],
         "risks": [
             {"category": "国内避险", "name": "黄金ETF", "code": "518880", "value_or_change": 0, "interpretation": "市场风险偏好提升"},
-            {"category": "国内安全", "name": "30年国债ETF", "code": "511260", "value_or_change": 0, "interpretation": "资金流向风险资产"},
+            {"category": "国内安全", "name": "30年国债ETF", "code": "511090", "value_or_change": 111, "interpretation": "资金流向风险资产"},
             {"category": "全球避险", "name": "COMEX黄金", "code": "GLOBAL_COMEX_GOLD", "value_or_change": 0, "interpretation": "避险情绪降温"},
             {"category": "全球风险锚", "name": "10年期美债收益率", "code": "US10Y", "value_or_change": 0, "interpretation": "对高估值成长股构成潜在压力"},
             {"category": "做多A股", "name": "YINN富时3倍做多中国", "code": "YINN", "value_or_change": 0, "interpretation": "外资看多看空"},
@@ -306,47 +306,27 @@ def buildUpDown(mock_up_down: Dict[str, Any]) -> Tuple[Dict[str, Any], bool]:
             activity = f"{round((up / (up + down) * 100) if (up + down) > 0 else 0.0, 1)}%"
         return {"up": up, "down": down, "activityPct": activity}, True
 
+
 """功能: 生成风格ETF涨跌数据。
-参数: etf_spot 为ETF快照(来自ak.fund_etf_spot_em), watch_styles 为监控清单, mock_styles 为回退数据。
+参数: watch_styles 为监控清单, mock_styles 为回退数据。
 返回: (风格数据列表, 是否使用回退)。
 """
-def buildStyles(etf_spot: Any, watch_styles: List[Dict[str, Any]], mock_styles: List[Dict[str, Any]]) -> Tuple[List[Dict[str, Any]], bool]:
+def buildStyles(watch_styles: List[Dict[str, Any]], mock_styles: List[Dict[str, Any]]) -> Tuple[List[Dict[str, Any]], bool]:
 
     try:
-        if etf_spot is None:
-            raise RuntimeError("ETF快照为空")
-        
-        # 根据akshare官方接口fund_etf_spot_em的列名进行匹配
-        code_col = firstCol(etf_spot, ["代码"]) or "代码"
-        pct_col = firstCol(etf_spot, ["涨跌幅"]) or "涨跌幅"
-        
-        # 验证必要列是否存在
-        if code_col not in etf_spot.columns:
-            raise RuntimeError(f"ETF快照中缺少代码列: {code_col}")
-        if pct_col not in etf_spot.columns:
-            raise RuntimeError(f"ETF快照中缺少涨跌幅列: {pct_col}")
-
-        # 创建代码到涨跌幅的映射，提高查找效率
-        etf_map: Dict[str, float] = {}
-        missing_codes = []
-        
-        for _, row in etf_spot.iterrows():
-            code = str(row.get(code_col, "")).strip()
-            pct_value = toFloatMaybe(row.get(pct_col))
-            
-            if code:
-                etf_map[code] = float(pct_value or 0.0)
-
         # 构建输出数据
         rows: List[Dict[str, Any]] = []
         found_count = 0
+        missing_codes = []
         
         for style_item in watch_styles:
             code = style_item["code"]
-            pct_value = etf_map.get(code)
+            
+            # 使用 getSpecificEtfChangePct 获取ETF涨跌幅
+            pct_value = getSpecificEtfChangePct(code)
             
             if pct_value is None:
-                # 记录未找到的代码
+                print(f'记录未找到的代码{code}\n')
                 missing_codes.append(code)
                 pct_value = 0.0
             else:
@@ -372,29 +352,20 @@ def buildStyles(etf_spot: Any, watch_styles: List[Dict[str, Any]], mock_styles: 
         logging.warning("风格获取失败，使用mock: %s", e)
         return mock_styles, True
 
+
 """功能: 生成行业与主题ETF及龙头个股涨跌数据。
-参数: etf_spot 与 a_spot 为快照(来自ak.fund_etf_spot_em和ak.stock_zh_a_spot_em), watch_sectors 为监控清单, mock_sectors 为回退数据。
+参数: a_spot 为A股快照(来自ak.stock_zh_a_spot_em), watch_sectors 为监控清单, mock_sectors 为回退数据。
 返回: (行业主题列表, 是否使用回退)。
 """
-def buildSectors(etf_spot: Any, a_spot: Any, watch_sectors: List[Dict[str, Any]], mock_sectors: List[Dict[str, Any]]) -> Tuple[List[Dict[str, Any]], bool]:
+def buildSectors(a_spot: Any, watch_sectors: List[Dict[str, Any]], mock_sectors: List[Dict[str, Any]]) -> Tuple[List[Dict[str, Any]], bool]:
 
     try:
-        if etf_spot is None or a_spot is None:
-            raise RuntimeError("ETF或A股快照为空")
+        if a_spot is None:
+            raise RuntimeError("A股快照为空")
         
         # 根据akshare官方接口的列名进行匹配
-        etf_code_col = firstCol(etf_spot, ["代码"]) or "代码"
-        etf_pct_col = firstCol(etf_spot, ["涨跌幅"]) or "涨跌幅"
-
         a_name_col = firstCol(a_spot, ["名称"]) or "名称"
         a_pct_col = firstCol(a_spot, ["涨跌幅"]) or "涨跌幅"
-
-        etf_map: Dict[str, float] = {}
-        for _, r in etf_spot.iterrows():
-            c = str(r.get(etf_code_col, "")).strip()
-            v = toFloatMaybe(r.get(etf_pct_col))
-            if c:
-                etf_map[c] = float(v or 0.0)
 
         a_map: Dict[str, float] = {}
         for _, r in a_spot.iterrows():
@@ -405,9 +376,13 @@ def buildSectors(etf_spot: Any, a_spot: Any, watch_sectors: List[Dict[str, Any]]
 
         out: List[Dict[str, Any]] = []
         for s in watch_sectors:
-            #ETF信息
+            #ETF信息 - 使用 getSpecificEtfChangePct 获取ETF涨跌幅
             code = s["code"]
-            change_pct = float(etf_map.get(code, 0.0))
+            change_pct = getSpecificEtfChangePct(code)
+            if change_pct is None:
+                print(f'记录未找到的代码{code}\n')
+                change_pct = 0.0
+            
             #龙头信息
             leaders = []
             for ln in s.get("leaders", []):
@@ -417,13 +392,14 @@ def buildSectors(etf_spot: Any, a_spot: Any, watch_sectors: List[Dict[str, Any]]
             out.append({
                 "etf_name": s["etf_name"],
                 "code": code,
-                "change_pct": change_pct,
+                "change_pct": float(change_pct),
                 "leaders": leaders,
             })
         return out, False
     except Exception as e:  # noqa: BLE001
         logging.warning("行业与主题获取失败，使用mock: %s", e)
         return mock_sectors, True
+
 
 
 
@@ -546,25 +522,31 @@ def getCryptoChangePct(code: str) -> Optional[float]:
 
     return  getUsStockChangePct(code)
 
+def getSpecificEtfChangePct(code: str) -> Optional[float]:
+    """功能: 使用 ak.fund_etf_hist_em 获取特定ETF(如 518880/511090) 最新一日涨跌幅(%)。
+    参数: code (ETF代码)。返回: 浮点数涨跌幅或 None(获取失败)。
+    """
+    try:
+        if ak is None:
+            return None
+        df = ak.fund_etf_hist_em(symbol=code, adjust="qfq")
+        if df is None or getattr(df, "empty", True) or len(df) < 1:
+            return None
+        latest = df.iloc[-1]
+        change = toFloatMaybe(latest.get("涨跌幅"))
+        if change is None:
+            return None
+        return float(change)
+    except Exception as e:  # noqa: BLE001
+        logging.warning(f"获取特定ETF {code} 涨跌幅失败: {e}")
+        return None
 
-def buildRisks(etf_spot: Any, watch_risks: List[Dict[str, Any]], mock_risks: List[Dict[str, Any]]) -> Tuple[List[Dict[str, Any]], bool]:
+def buildRisks(watch_risks: List[Dict[str, Any]], mock_risks: List[Dict[str, Any]]) -> Tuple[List[Dict[str, Any]], bool]:
     """功能: 汇总风险偏好与风险锚指标。
-    参数: etf_spot 为ETF快照(来自ak.fund_etf_spot_em), watch_risks 为监控清单, mock_risks 为回退数据。
+    参数: watch_risks 为监控清单, mock_risks 为回退数据。
     返回: (风险列表, 是否使用回退)。
     """
     try:
-        # ETF快照用于国内ETF代码
-        etf_map: Dict[str, float] = {}
-        if etf_spot is not None and not getattr(etf_spot, "empty", True):
-            code_col = firstCol(etf_spot, ["代码"]) or "代码"
-            pct_col = firstCol(etf_spot, ["涨跌幅"]) or "涨跌幅"
-            if code_col in etf_spot.columns and pct_col in etf_spot.columns:
-                for _, r in etf_spot.iterrows():
-                    c = str(r.get(code_col, "")).strip()
-                    v = toFloatMaybe(r.get(pct_col))
-                    if c:
-                        etf_map[c] = float(v or 0.0)
-
         # 逐项构建，单项失败仅回退该项
         out: List[Dict[str, Any]] = []
         mock_map = {m.get("code"): m for m in mock_risks}
@@ -574,17 +556,17 @@ def buildRisks(etf_spot: Any, watch_risks: List[Dict[str, Any]], mock_risks: Lis
             val: Optional[float] = None
 
             try:
-                if code in ("518880", "511260"):
-                    val = etf_map.get(code)
-                elif code == "GLOBAL_COMEX_GOLD":
+                if code == "GLOBAL_COMEX_GOLD":
                     val = getComexGoldChangePct() 
                 elif code == "US10Y":
                     val = getUsStockChangePct("^TNX")
                 elif code == "YINN":
                     val = getUsStockChangePct("YINN")
+                else:
+                    val = getSpecificEtfChangePct(code)
+                    print(f'{code} 涨幅：{val} \n')
             except Exception:
                 val = None
-
 
             if val is None:
                 mv = mock_map.get(code, {})
@@ -677,21 +659,22 @@ def fetch_all_data() -> Dict[str, Any]:
         logging.warning("获取A股快照失败: %s", e)
         a_spot = None
 
-    # 拉取批量快照 东方财富网-ETF 实时行情
-    try:
-        etf_spot = ak.fund_etf_spot_em()
-    except Exception as e:  # noqa: BLE001
-        logging.warning("获取ETF快照失败: %s", e)
-        etf_spot = None
+
 
     # 构造各段
+  
+    logging.info("开始构建指数数据...")
     indexes, fb_idx = buildIndexes(watch.INDEXES, mock["indexes"])                   # 构建指数数据，fb_idx为是否回退到mock
+    logging.info("开始构建涨跌家数数据...")
     up_down, fb_ud = buildUpDown(mock["up_down"])                                     # 构建涨跌家数，fb_ud为是否回退到mock
-    styles, fb_st = buildStyles(etf_spot, watch.STYLES, mock["styles"])              # 构建风格ETF数据，fb_st为是否回退到mock
-    sectors, fb_sc = buildSectors(etf_spot, a_spot, watch.SECTORS, mock["sectors"])  # 构建行业与主题ETF数据，fb_sc为是否回退到mock
-    risks, fb_rk = buildRisks(etf_spot, watch.RISKS, mock["risks"])                  # 构建风险偏好数据，fb_rk为是否回退到mock
+    logging.info("开始构建风格ETF数据...")
+    styles, fb_st = buildStyles(watch.STYLES, mock["styles"])              # 构建风格ETF数据，fb_st为是否回退到mock
+    logging.info("开始构建行业与主题ETF数据...")
+    sectors, fb_sc = buildSectors(a_spot, watch.SECTORS, mock["sectors"])  # 构建行业与主题ETF数据，fb_sc为是否回退到mock
+    logging.info("开始构建风险偏好数据...")
+    risks, fb_rk = buildRisks(watch.RISKS, mock["risks"])                  # 构建风险偏好数据，fb_rk为是否回退到mock
+    logging.info("开始构建全球关联数据...")
     globals_list, fb_gl = buildGlobals(watch.GLOBALS, mock["globals"])               # 构建全球关联数据，fb_gl为是否回退到mock
-
     # 创建回退标志字典，记录各个数据源的回退状态
     # 每个键值对表示对应数据类别是否使用了回退数据源
     fallback_flags: Dict[str, bool] = {
