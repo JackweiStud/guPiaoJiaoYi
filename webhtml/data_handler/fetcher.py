@@ -531,6 +531,7 @@ def getSpecificEtfChangePct(code: str) -> Optional[float]:
             return None
         df = ak.fund_etf_hist_em(symbol=code, adjust="qfq")
         if df is None or getattr(df, "empty", True) or len(df) < 1:
+            print(f"ETF代码 {code} 获取历史数据失败")
             return None
         latest = df.iloc[-1]
         change = toFloatMaybe(latest.get("涨跌幅"))
