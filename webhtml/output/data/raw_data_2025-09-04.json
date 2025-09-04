@@ -273,14 +273,14 @@
       "category": "全球避险",
       "name": "COMEX黄金",
       "code": "GLOBAL_COMEX_GOLD",
-      "value_or_change": 0.17811829487217032,
+      "value_or_change": 0.3979753151076724,
       "interpretation": "避险情绪降温"
     },
     {
       "category": "全球风险锚",
       "name": "10年期美债收益率",
       "code": "US10Y",
-      "value_or_change": -1.5431377133504753,
+      "value_or_change": 0.0,
       "interpretation": "对高估值成长股构成潜在压力"
     },
     {
@@ -338,21 +338,21 @@
       "category": "汇率",
       "indicator": "美元/离岸CNH",
       "code": "CNH=X",
-      "value_or_change": 0.04651482099500293,
+      "value_or_change": 0.043432513579664066,
       "interpretation": "人民币升值，利好外资流入"
     },
     {
       "category": "加密货币",
       "indicator": "比特币(BTC)",
       "code": "BTC-USD",
-      "value_or_change": -0.6772197301920749,
+      "value_or_change": -0.7255801672952489,
       "interpretation": "全球投机情绪回暖"
     },
     {
       "category": "加密货币",
       "indicator": "以太坊(ETH)",
       "code": "ETH-USD",
-      "value_or_change": -0.7287255618478419,
+      "value_or_change": -0.9156263574255603,
       "interpretation": "高风险偏好资产表现强势"
     }
   ],
