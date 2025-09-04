@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>金融行情监控仪表盘 (静态版)</title>
+    <title>金融行情每日早晚报道</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
         body { font-family: 'Inter', 'Helvetica Neue', 'Helvetica', 'Arial', 'sans-serif'; }
@@ -48,7 +48,7 @@
                                     <td class="p-3 text-right font-semibold {{ idx.change_class }}">{{ idx.change_pct_str }}</td>
                                     <td class="p-3 text-right">{{ idx.turnover_billion }}</td>
                                     {% if loop.first %}
-                                    <td class="p-3 text-center font-bold {{ up_down.class }}" rowspan="{{ indexes | length }}">{{ up_down.up }} : {{ up_down.down }}<br><span class="text-sm text-slate-500 font-normal">({{ up_down.label }})</span></td>
+                                    <td class="p-3 text-center font-bold {{ up_down.class }}" rowspan="{{ indexes | length }}">{{ up_down.up }} : {{ up_down.down }}<br><span class="text-sm text-slate-500 font-normal">({{ up_down.label }})</span><br><span class="text-xs text-slate-400 font-normal">活跃度: {{ up_down.activityPct }}</span></td>
                                     {% endif %}
                                 </tr>
                                 {% endfor %}
@@ -77,10 +77,10 @@
                             </thead>
                             <tbody class="divide-y divide-slate-100">
                                 {% for group in styles_groups %}
-                                    {% for item in group.items %}
+                                    {% for item in group['items'] %}
                                     <tr class="{{ item.row_class }}">
                                         {% if loop.first %}
-                                        <td class="p-3 font-semibold" rowspan="{{ group.items | length }}">{{ group.category }}</td>
+                                        <td class="p-3 font-semibold" rowspan="{{ group['items'] | length }}">{{ group.category }}</td>
                                         {% endif %}
                                         <td class="p-3">{{ item.name }}</td>
                                         <td class="p-3 text-slate-500">{{ item.code }}</td>
@@ -164,10 +164,10 @@
                         </thead>
                         <tbody class="divide-y divide-slate-100">
                             {% for group in globals_groups %}
-                                {% for item in group.items %}
+                                {% for item in group['items'] %}
                                 <tr class="{{ item.row_class }}">
                                     {% if loop.first %}
-                                    <td class="p-3 font-semibold" rowspan="{{ group.items | length }}">{{ group.category }}</td>
+                                    <td class="p-3 font-semibold" rowspan="{{ group['items'] | length }}">{{ group.category }}</td>
                                     {% endif %}
                                     <td class="p-3">{{ item.indicator }}</td>
                                     <td class="p-3 text-right font-semibold {{ item.change_class }}">{{ item.value_or_change_str }}</td>

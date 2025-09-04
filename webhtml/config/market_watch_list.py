@@ -46,15 +46,15 @@ RISKS = [
 
 # 全球环境与关联市场
 GLOBALS = [
-    {"category": "关联圈 (香港)", "indicator": "恒生指数", "code": "HSI"},
-    {"category": "关联圈 (香港)", "indicator": "恒生科技指数", "code": "HSTECH"},
-    {"category": "环境圈 (美股)", "indicator": "标普500", "code": "^GSPC"},
-    {"category": "环境圈 (美股)", "indicator": "纳斯达克100", "code": "^NDX"},
-    {"category": "环境圈 (美股)", "indicator": "英伟达(NVDA)", "code": "NVDA"},
-    {"category": "环境圈 (美股)", "indicator": "金龙中国指数", "code": "PGJ"},
-    {"category": "环境圈 (其他)", "indicator": "美元/离岸CNH", "code": "USDCNH"},
-    {"category": "环境圈 (加密货币)", "indicator": "比特币(BTC)", "code": "BTCUSDT"},
-    {"category": "环境圈 (加密货币)", "indicator": "以太坊(ETH)", "code": "ETHUSDT"},
+    {"category": "香港", "indicator": "恒生指数", "code": "^HSI"},
+    {"category": "香港", "indicator": "恒生科技指数", "code": "HSTECH.HK"},
+    {"category": "美股", "indicator": "标普500", "code": "^GSPC"},
+    {"category": "美股", "indicator": "纳斯达克100", "code": "^NDX"},
+    {"category": "美股", "indicator": "英伟达(NVDA)", "code": "NVDA"},
+    {"category": "美股", "indicator": "金龙中国指数", "code": "PGJ"},
+    {"category": "汇率", "indicator": "美元/离岸CNH", "code": "CNH=X"},
+    {"category": "加密货币", "indicator": "比特币(BTC)", "code": "BTC-USD"},
+    {"category": "加密货币", "indicator": "以太坊(ETH)", "code": "ETH-USD"},
 ]
 
 
