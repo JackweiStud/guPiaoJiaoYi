@@ -48,5 +48,55 @@
       "float",
       0.001
     ]
+  },
+  "512820": {
+    "short_window": [
+      2,
+      5,
+      "int"
+    ],
+    "long_window": [
+      10,
+      18,
+      "int"
+    ],
+    "volume_mavg_Value": [
+      6,
+      10,
+      "int"
+    ],
+    "MaRateUp": [
+      0.95,
+      1.18,
+      "float",
+      0.01
+    ],
+    "VolumeSellRate": [
+      3,
+      7,
+      "int"
+    ],
+    "rsi_period": [
+      10,
+      18,
+      "int"
+    ],
+    "rsiValueThd": [
+      25,
+      35,
+      "int"
+    ],
+    "rsiRateUp": [
+      1.0,
+      1.6,
+      "float",
+      0.02
+    ],
+    "divergence_threshold": [
+      0.011138800044039105,
+      0.030595884480075657,
+      "float",
+      0.001
+    ]
   }
 }

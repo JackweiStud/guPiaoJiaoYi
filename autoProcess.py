@@ -277,12 +277,13 @@ def autoProcessETF(target_stock_code):
     run_trading_strategy(target_stock_code)
 
 if __name__ == "__main__":
-
-    
+   
     autoProcessETF("511090.SH") ##国债
-    autoProcessETF("161128.SH") ##每股
+    autoProcessETF("161128.SH") ##美股
     autoProcessETF("513160.SH") ##ganggu30
     autoProcessETF("159843.SH") ##消费
     autoProcessETF("588180.SH") #科创50
     autoProcessETF("159915.SH") ##创业
+    autoProcessETF("512820.SH") ##银行
+    
 

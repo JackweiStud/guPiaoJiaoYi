@@ -2262,17 +2262,21 @@ if __name__ == "__main__":
 
    #testAuto(symbol = "159915")
    #testAuto(symbol = "588180")
-   ganggu30ETFParaFind()
+   #ganggu30ETFParaFind()
    #testAuto(symbol = "513160") # 港股
 
    #testAuto(symbol = "513160") # 港股
+
 
    #gangguxiaofeiETFParaFind()
    #testAuto(symbol = "159843") # 消费
 
    #find_best_params("159843")
-   #find_best_params("511090")
+   #find_best_params("512820")
 
    #testAuto(symbol = "511090") # 国债
    #testAuto(symbol = "159843") # 消费
+
+   # #find_best_params("512820")
+   testAuto(symbol = "512820") # 银行
    

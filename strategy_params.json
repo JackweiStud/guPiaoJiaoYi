@@ -78,6 +78,17 @@
         "rsiValueThd": 27, 
         "rsiRateUp": 0.9, 
         "divergence_threshold": 0.017 
+    },
+    "512820":{
+        "short_window": 5,
+        "long_window": 15, 
+        "volume_mavg_Value": 10, 
+        "MaRateUp": 0.97, 
+        "VolumeSellRate": 3,
+        "rsi_period": 14, 
+        "rsiValueThd": 30, 
+        "rsiRateUp": 1.36, 
+        "divergence_threshold": 0.014
     }
 
 }

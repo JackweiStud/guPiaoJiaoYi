@@ -87,7 +87,7 @@ class DeepSeekAnalyzer:
             data_sample = df.tail(80)
             data_str = data_sample.to_markdown()
             data_summary = f"数据时间范围：{df['DateTime'].min()} 至 {df['DateTime'].max()}"
-            #print("content" + f"{user_prompt}\n{data_summary}\n样本数据：\n{data_str}")
+            print("content" + f"{data_summary}\n样本数据：\n{data_str}")
             #print("user_prompt:" + f"{user_prompt}\n")
 
             print("------------process_response 开始--------------------")
