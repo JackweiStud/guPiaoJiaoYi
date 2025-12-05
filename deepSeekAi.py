@@ -234,7 +234,9 @@ def aiDeepSeekAnly(code):
 
     # 2. 加载数据
     loader = ETFDataLoader()
-    dataPath = f"D:/code-touzi/gitHub/guPiaoJiaoYi/stock_data/{code}/{code}_Day.csv"
+    # 使用相对路径，基于脚本所在目录
+    script_dir = Path(__file__).parent
+    dataPath = script_dir / "stock_data" / code / f"{code}_Day.csv"
     
     try:
         print(f"开始加载{code}数据文件：{dataPath}")

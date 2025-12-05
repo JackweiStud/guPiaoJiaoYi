@@ -1,0 +1,63 @@
+# Python 编译文件和缓存
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+
+# 数据目录（用户明确要求忽略）
+stock_data/
+pic/
+
+# 日志文件
+*.log
+*.log.*
+
+# IDE 配置文件（VS Code 配置通常不提交，如需提交可删除此行）
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# 虚拟环境
+venv/
+env/
+ENV/
+.venv
+
+# 环境变量文件
+.env
+.env.local
+.env.*.local
+
+# 操作系统文件
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# 临时文件
+*.tmp
+*.temp
+*.bak
+*.backup
+
+# 测试覆盖率
+htmlcov/
+.coverage
+.coverage.*
+.pytest_cache/
+.tox/
+
+# 分发/打包
+dist/
+build/
+*.egg-info/
+*.egg
+
+# Jupyter Notebook
+.ipynb_checkpoints
+
+# 特定项目临时文件
+auto_run.log
+stock_data/**/*.log
