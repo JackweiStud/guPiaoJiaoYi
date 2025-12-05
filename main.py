@@ -7,7 +7,7 @@ from config import ETFConfig
 def ETFTest(code):
     exchange_prefix = code.split(".")[1].lower()
     symbol = f"{code.split('.')[0]}"
-    print(f"----开始获取{symbol}_ETF分钟数据----------） ")
+    #print(f"----开始获取{symbol}_ETF分钟数据----------） ")
 
     # 初始化配置
     config = ETFConfig(stock_code=f"{symbol}",periods=['120'])
@@ -17,17 +17,17 @@ def ETFTest(code):
     storage = ETFStorage(config)
     
     # 遍历所有周期 - min
-    for period in config.periods:
-        print(f"正在获取 {period} 分钟数据...")
-        df = fetcher.fetch_minute_data(period)
-        
-        if not df.empty:
-            filepath = storage._get_filepath(period)
-            print(f"path is {filepath}")
-            new_count = storage.saveDataToFile(df, filepath)
-            print(f"成功保存 {period} 分钟数据，新增 {new_count} 条")
-        else:
-            print(f"未获取到 {config.stock_code} {period} 分钟数据")
+    # for period in config.periods:
+    #     print(f"正在获取 {period} 分钟数据...")
+    #     df = fetcher.fetch_minute_data(period)
+    #     
+    #     if not df.empty:
+    #         filepath = storage._get_filepath(period)
+    #         print(f"path is {filepath}")
+    #         new_count = storage.saveDataToFile(df, filepath)
+    #         print(f"成功保存 {period} 分钟数据，新增 {new_count} 条")
+    #     else:
+    #         print(f"未获取到 {config.stock_code} {period} 分钟数据")
     
     # daily 数据
     daily_df = fetcher.get_etf_dailyNew()
