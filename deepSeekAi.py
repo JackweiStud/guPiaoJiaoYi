@@ -239,7 +239,7 @@ def aiDeepSeekAnly(code):
     dataPath = script_dir / "stock_data" / code / f"{code}_Day.csv"
     
     try:
-        print(f"开始加载{code}数据文件：{dataPath}")
+        #print(f"开始加载{code}数据文件：{dataPath}")
         df = loader.load_etf_data(file_path=dataPath)
         print(f"数据加载成功，共{len(df)}条记录")
     except FileNotFoundError:

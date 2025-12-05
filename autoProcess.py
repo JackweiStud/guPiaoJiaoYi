@@ -31,13 +31,31 @@ def run_trading_strategy(stock_code):
     print(f"执行时间: {get_beijing_time().strftime('%Y-%m-%d %H:%M:%S')}")
     print("="*50)
 
-    # 1. 获取最新的ETF数据，增加鲁棒性
+    # 1. 获取最新的ETF数据，增加鲁棒性（返回值检查 + 重试）
     try:
         print("\n[步骤 1/3] 正在获取最新ETF数据...")
-        ETFTest(stock_code)
-        print("数据获取成功。")
+        max_retries = 3
+        delay_seconds = 15
+        success = False
+
+        for attempt in range(1, max_retries + 1):
+            success = ETFTest(stock_code)
+            if success:
+                print("数据获取成功。")
+                break
+
+            if attempt < max_retries:
+                print(f"第 {attempt} 次获取ETF数据失败，{delay_seconds} 秒后重试...")
+                time.sleep(delay_seconds)
+
+        if not success:
+            msg = f"在连续 {max_retries} 次尝试后仍未成功获取 {stock_code} 的ETF数据。"
+            print(msg)
+            notify_error(f"ETF数据获取失败 for {stock_code}", msg)
+            return
+
     except Exception as e:
-        print(f"错误：获取ETF数据失败。错误信息: {e}")
+        print(f"错误：获取ETF数据失败（异常）。错误信息: {e}")
         # 如果数据获取失败，可以选择发送错误邮件或直接退出
         notify_error(f"ETF数据获取失败 for {stock_code}", f"错误详情: {e}")
         return

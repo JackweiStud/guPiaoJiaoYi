@@ -1,5 +1,6 @@
 import akshare as ak
 import pandas as pd
+from tenacity import retry, stop_after_attempt, wait_exponential
 from config import ETFConfig
 
 class ETFFetcher:
@@ -23,6 +24,24 @@ class ETFFetcher:
         except Exception as e:
             print(f"[Error] {self.config.stock_code} {period}分钟数据获取失败: {str(e)}")
             return pd.DataFrame()
+
+    @retry(
+        stop=stop_after_attempt(3),  # 最多重试 3 次
+        wait=wait_exponential(multiplier=2, min=2, max=16),  # 指数退避：2s, 4s, 8s...
+        reraise=True
+    )
+    def _fetch_etf_daily_raw(self, symbol, period, start_date, end_date, adjust):
+        """
+        带重试的底层请求封装，任何异常都会触发重试。
+        单独拆出来，避免把数据处理逻辑也重复执行。
+        """
+        return ak.fund_etf_hist_em(
+            symbol=symbol,
+            period=period,
+            start_date=start_date,
+            end_date=end_date,
+            adjust=adjust
+        )
 
     def _etf_min_format_data(self, df):
         """统一数据格式"""
@@ -49,11 +68,12 @@ class ETFFetcher:
             start_date=f"{self.config.start_date.split()[0].replace('-', '')}"
             end_date=f"{self.config.end_time.split()[0].replace('-', '')}"
 
-            df = ak.fund_etf_hist_em(
+            # 通过带重试的底层方法获取数据（当前 akshare 版本不支持 timeout 参数，只能使用库内部默认超时）
+            df = self._fetch_etf_daily_raw(
                 symbol=f"{self.config.stock_code}",
                 period="daily",
-                start_date=f"{start_date}",
-                end_date=f"{end_date}",
+                start_date=start_date,
+                end_date=end_date,
                 adjust=""
             )
             return self._process_raw_dataDaily(df)
