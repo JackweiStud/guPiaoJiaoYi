@@ -1,20 +1,22 @@
+import sys
+import os
+
+# 将项目根目录添加到 Python 模块搜索路径中（必须在所有导入之前）
+# 这使得脚本可以找到 webhtml 等模块
+# __file__ 是 webhtml/main.py，需要往上一级到项目根目录
+project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, project_root)
+print('code path is ', project_root)
+
 import logging
 from datetime import datetime
 from typing import Dict, Any
-import sys
-import os
 from webhtml.config import settings
 from webhtml.reporter.generator import render_report, save_report, backup_raw_data
 from webhtml.reporter.mailer import send_report_mail
 from webhtml.data_handler.fetcher import fetch_all_data
 from webhtml.analysis.calculator import build_report_view
 from webhtml.analysis.ai_summary import generate_ai_summary
-
-# 将项目根目录添加到 Python 模块搜索路径中
-# 这使得脚本可以找到 emailFile 等兄弟模块
-project_root = os.path.dirname((os.path.abspath(__file__)))
-sys.path.append(project_root)
-print('code path is ',project_root)
 
 def setup_logging() -> None:
     settings.ensure_directories()
