@@ -128,11 +128,23 @@ def build_report_view(raw: Dict[str, Any]) -> Dict[str, Any]:
     # 风险偏好
     risks_view = []
     for i, r in enumerate(raw.get("risks", [])):
+        # 格式化价格显示
+        price = r.get("price")
+        if price is not None:
+            if price >= 1000:
+                price_str = f"{price:,.2f}"
+            elif price >= 1:
+                price_str = f"{price:.2f}"
+            else:
+                price_str = f"{price:.4f}"
+        else:
+            price_str = "-"
         risks_view.append({
             "category": r["category"],
             "name": r["name"],
+            "price_str": price_str,
             "change_class": _class_by_value(r.get("value_or_change", 0.0)),
-            # 如果名称以“收益率”结尾，则格式化为“↑ xx.xx%”，否则用通用百分比格式化函数
+            # 如果名称以"收益率"结尾，则格式化为"↑ xx.xx%"，否则用通用百分比格式化函数
             "value_or_change_str": (
                 f"↑ {r['value_or_change']:.2f}%" if r["name"].endswith("收益率")
                 else _pct_to_str(r.get("value_or_change", 0.0))
@@ -150,8 +162,20 @@ def build_report_view(raw: Dict[str, Any]) -> Dict[str, Any]:
     for cat, items in groups2.items():
         vitems = []
         for i, it in enumerate(items):
+            # 格式化价格显示
+            price = it.get("price")
+            if price is not None:
+                if price >= 1000:
+                    price_str = f"{price:,.2f}"
+                elif price >= 1:
+                    price_str = f"{price:.2f}"
+                else:
+                    price_str = f"{price:.4f}"
+            else:
+                price_str = "-"
             vitems.append({
                 "indicator": it["indicator"],
+                "price_str": price_str,
                 "change_class": _class_by_value(it.get("value_or_change", 0.0)),
                 "value_or_change_str": _pct_to_str(it.get("value_or_change", 0.0)),
                 "interpretation": it.get("interpretation", ""),

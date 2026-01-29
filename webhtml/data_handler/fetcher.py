@@ -219,9 +219,9 @@ def _mock_raw_data() -> Dict[str, Any]:
             ]},
         ],
         "risks": [
-            {"category": "国内避险", "name": "黄金ETF", "code": "518880", "value_or_change": 0, "interpretation": "市场风险偏好提升"},
+            {"category": "国内避险", "name": "黄金ETF", "code": "518880", "value_or_change": 0, "interpretation": "市场风险偏好"},
             {"category": "国内安全", "name": "30年国债ETF", "code": "511090", "value_or_change": 111, "interpretation": "资金流向风险资产"},
-            {"category": "全球避险", "name": "COMEX黄金", "code": "GLOBAL_COMEX_GOLD", "value_or_change": 0, "interpretation": "避险情绪降温"},
+            {"category": "全球避险", "name": "COMEX黄金", "code": "GLOBAL_COMEX_GOLD", "value_or_change": 0, "interpretation": "避险情绪"},
             {"category": "全球风险锚", "name": "10年期美债收益率", "code": "US10Y", "value_or_change": 0, "interpretation": "对高估值成长股构成潜在压力"},
             {"category": "做多A股", "name": "YINN富时3倍做多中国", "code": "YINN", "value_or_change": 0, "interpretation": "外资看多看空"},
         ],
@@ -736,6 +736,42 @@ def getSpecificEtfChangePct(code: str, sina_code: str = None) -> Optional[float]
     logging.warning(f"ETF {code} 所有接口均失败")
     return None
 
+
+def getSpecificEtfChangePctWithPrice(code: str, sina_code: str = None) -> Optional[Tuple[float, float]]:
+    """功能: 获取特定ETF最新一日涨跌幅(%)和价格。
+    优先使用新浪接口（更稳定），失败时使用东方财富接口备用。
+    参数: code (ETF代码), sina_code (新浪代码，可选)。
+    返回: (涨跌幅, 价格) 或 None(获取失败)。
+    """
+    # ===== 方案1: 优先使用新浪接口 =====
+    target_sina_code = sina_code or _convert_code_to_sina(code)
+    try:
+        sina_data = _sina_realtime_quote([target_sina_code])
+        if target_sina_code in sina_data:
+            data = sina_data[target_sina_code]
+            change_pct = data.get("change_pct", 0.0)
+            price = data.get("price", 0.0)
+            return (change_pct, price)
+    except Exception as e:
+        logging.debug(f"新浪ETF {target_sina_code} 接口失败: {e}")
+    
+    # ===== 方案2: 东方财富接口备用 =====
+    try:
+        if ak is not None:
+            df = ak.fund_etf_hist_em(symbol=code, adjust="qfq")
+            if df is not None and not getattr(df, "empty", True) and len(df) >= 1:
+                latest = df.iloc[-1]
+                change = toFloatMaybe(latest.get("涨跌幅"))
+                close = toFloatMaybe(latest.get("收盘"))
+                if change is not None:
+                    return (float(change), float(close) if close else 0.0)
+    except Exception as e:
+        logging.debug(f"东方财富ETF {code} 接口也失败: {e}")
+    
+    logging.warning(f"ETF {code} 所有接口均失败")
+    return None
+
+
 def buildRisks(watch_risks: List[Dict[str, Any]], mock_risks: List[Dict[str, Any]]) -> Tuple[List[Dict[str, Any]], bool]:
     """功能: 汇总风险偏好与风险锚指标。
     参数: watch_risks 为监控清单, mock_risks 为回退数据。
@@ -766,6 +802,7 @@ def buildRisks(watch_risks: List[Dict[str, Any]], mock_risks: List[Dict[str, Any
         
         # 批量获取全球资产（yfinance，带重试）
         global_pct_map: Dict[str, float] = {}
+        global_price_map: Dict[str, float] = {}  # 保存价格
         if global_tickers and yf is not None:
             for attempt in range(6):  # 最多重试3次
                 try:
@@ -794,6 +831,8 @@ def buildRisks(watch_risks: List[Dict[str, Any]], mock_risks: List[Dict[str, Any
                                 if len(closes) >= 2:
                                     prev_close = closes.iloc[-2]
                                     last_close = closes.iloc[-1]
+                                    # 保存价格
+                                    global_price_map[ticker] = float(last_close)
                                     if prev_close > 0:
                                         pct = ((last_close - prev_close) / prev_close) * 100
                                         global_pct_map[ticker] = float(pct)
@@ -814,16 +853,19 @@ def buildRisks(watch_risks: List[Dict[str, Any]], mock_risks: List[Dict[str, Any
         for r in watch_risks:
             code = r["code"]
             val: Optional[float] = None
+            price: Optional[float] = None
 
             # 获取数据
             if code in code_to_ticker:
                 # 全球资产从批量结果获取
                 ticker = code_to_ticker[code]
                 val = global_pct_map.get(ticker)
+                price = global_price_map.get(ticker)
             else:
                 # 国内ETF用新浪接口
-                val = getSpecificEtfChangePct(code)
-                if val is not None:
+                result = getSpecificEtfChangePctWithPrice(code)
+                if result is not None:
+                    val, price = result
                     logging.info(f'{code} 涨幅：{val:.2f}%')
 
             # 失败则用 mock
@@ -835,6 +877,7 @@ def buildRisks(watch_risks: List[Dict[str, Any]], mock_risks: List[Dict[str, Any
                 "category": r["category"],
                 "name": r["name"],
                 "code": code,
+                "price": price,  # 新增价格字段
                 "value_or_change": float(val or 0.0),
                 "interpretation": str(mock_map.get(code, {}).get("interpretation", "")),
             })
@@ -864,6 +907,7 @@ def buildGlobals(watch_globals: List[Dict[str, Any]], mock_globals: List[Dict[st
         
         # 批量下载数据（带重试机制，应对限流）
         change_pct_map: Dict[str, float] = {}
+        price_map: Dict[str, float] = {}  # 保存价格
         for attempt in range(3):  # 最多重试3次
             try:
                 if attempt > 0:
@@ -891,6 +935,11 @@ def buildGlobals(watch_globals: List[Dict[str, Any]], mock_globals: List[Dict[st
                             if closes is not None and len(closes) >= 2:
                                 last_close = closes.iloc[-1]
                                 prev_close = closes.iloc[-2]
+                                # 保存价格（取最后一个有效值）
+                                if pd.notna(last_close):
+                                    price_map[ticker] = float(last_close)
+                                elif pd.notna(prev_close):
+                                    price_map[ticker] = float(prev_close)
                                 # 计算涨跌幅
                                 if pd.notna(last_close) and pd.notna(prev_close) and prev_close > 0:
                                     pct = ((last_close - prev_close) / prev_close) * 100
@@ -918,6 +967,7 @@ def buildGlobals(watch_globals: List[Dict[str, Any]], mock_globals: List[Dict[st
             
             # 从批量结果获取，失败则用 mock
             val = change_pct_map.get(code)
+            price = price_map.get(code)
             if val is None:
                 mv = mock_map.get(code, {})
                 val = toFloatMaybe(mv.get("value_or_change", 0.0)) or 0.0
@@ -926,6 +976,7 @@ def buildGlobals(watch_globals: List[Dict[str, Any]], mock_globals: List[Dict[st
                 "category": category,
                 "indicator": g["indicator"],
                 "code": code,
+                "price": price,  # 新增价格字段
                 "value_or_change": float(val or 0.0),
                 "interpretation": str(mock_map.get(code, {}).get("interpretation", "")),
             })
