@@ -10,10 +10,12 @@ ref : https://akshare.akfamily.xyz/data/index/index.html
 
 from __future__ import annotations
 
-from typing import Dict, Any, List, Optional, Tuple
+from typing import Dict, Any, List, Optional, Tuple, Callable
 from datetime import datetime, date
 import logging
 import pandas as pd
+import time
+import random
 
 from webhtml.config import market_watch_list as watch  # 监控清单(指数/风格/行业/风险/全球)
 from webhtml.config import settings  # 路径与日期等配置
@@ -27,6 +29,126 @@ try:
     import yfinance as yf  # type: ignore
 except Exception:  # noqa: BLE001
     yf = None  # 允许在无 yfinance 环境下运行
+
+import requests
+import re
+
+# ============================================================
+# 新浪实时行情接口 (作为东方财富接口的备用数据源)
+# ============================================================
+def _sina_realtime_quote(codes: List[str]) -> Dict[str, Dict[str, Any]]:
+    """
+    通过新浪接口获取实时行情数据
+    
+    参数:
+        codes: 股票/指数/ETF代码列表，格式如 ["sh000001", "sz300750", "sh510050"]
+               - sh 开头: 上海市场
+               - sz 开头: 深圳市场
+    
+    返回:
+        {代码: {"name": 名称, "price": 最新价, "change_pct": 涨跌幅, "volume": 成交量, "amount": 成交额}}
+    """
+    if not codes:
+        return {}
+    
+    codes_str = ",".join(codes)
+    url = f"http://hq.sinajs.cn/list={codes_str}"
+    
+    headers = {
+        "Referer": "http://finance.sina.com.cn",
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+    }
+    
+    try:
+        resp = requests.get(url, headers=headers, timeout=15)
+        resp.encoding = "gbk"
+        
+        result = {}
+        lines = resp.text.strip().split("\n")
+        
+        for line in lines:
+            # 解析格式: var hq_str_sh600036="招商银行,..."
+            match = re.match(r'var hq_str_(\w+)="(.*)";', line)
+            if match:
+                code = match.group(1)
+                data = match.group(2)
+                if data:
+                    parts = data.split(",")
+                    if len(parts) >= 9:
+                        name = parts[0]
+                        # 指数: parts[1]=今开, parts[2]=昨收, parts[3]=当前价
+                        # 个股: parts[1]=今开, parts[2]=昨收, parts[3]=当前价, parts[8]=成交量, parts[9]=成交额
+                        try:
+                            current = float(parts[3]) if parts[3] else 0
+                            yesterday = float(parts[2]) if parts[2] else 0
+                            if yesterday > 0:
+                                change_pct = (current - yesterday) / yesterday * 100
+                            else:
+                                change_pct = 0.0
+                            
+                            volume = float(parts[8]) if len(parts) > 8 and parts[8] else 0
+                            amount = float(parts[9]) if len(parts) > 9 and parts[9] else 0
+                            
+                            result[code] = {
+                                "name": name,
+                                "price": current,
+                                "change_pct": round(change_pct, 2),
+                                "volume": volume,
+                                "amount": amount,
+                                "yesterday": yesterday,
+                            }
+                        except (ValueError, IndexError):
+                            continue
+        
+        return result
+    except Exception as e:
+        logging.warning("新浪接口请求失败: %s", e)
+        return {}
+
+
+def _convert_code_to_sina(code: str) -> str:
+    """
+    将普通代码转换为新浪接口格式
+    
+    输入: "000001" 或 "sh000001" 或 "510050"
+    输出: "sh000001" 或 "sz000001"
+    """
+    code = str(code).strip().lower()
+    
+    # 已经是 sh/sz 开头
+    if code.startswith("sh") or code.startswith("sz"):
+        return code
+    
+    # 去掉可能的前缀
+    code = code.lstrip("0")
+    if not code:
+        code = "000001"
+    code = code.zfill(6)
+    
+    # 根据代码判断市场
+    # 6开头 -> 上海, 0/3开头 -> 深圳, 5开头 -> 上海ETF, 1开头 -> 深圳ETF
+    if code.startswith("6") or code.startswith("5"):
+        return f"sh{code}"
+    elif code.startswith("0") or code.startswith("3") or code.startswith("1"):
+        return f"sz{code}"
+    else:
+        return f"sh{code}"
+
+
+def _retry_call(func: Callable, max_retries: int = 5, delay_range: tuple = (2, 5), func_name: str = ""):
+    """带重试机制的函数调用，应对网络不稳定"""
+    for attempt in range(max_retries):
+        try:
+            if attempt > 0:
+                delay = random.uniform(*delay_range)
+                logging.info("第 %d 次重试 %s，等待 %.1f 秒...", attempt + 1, func_name, delay)
+                time.sleep(delay)
+            return func()
+        except Exception as e:
+            logging.warning("第 %d 次尝试 %s 失败: %s", attempt + 1, func_name, e)
+            if attempt == max_retries - 1:
+                raise
+    return None
 
 
 def _mock_raw_data() -> Dict[str, Any]:
@@ -187,12 +309,48 @@ def roundToInt(v: Optional[float]) -> int:
 输入参数为：监控指数列表 watch_indexes 和回退指数列表 mock_indexes。
 返回值为一个元组: (指数数据列表, 是否使用回退)。
 
+优先使用新浪接口（更稳定），若失败则使用东方财富接口备用。
 """
 def buildIndexes(watch_indexes: List[Dict[str, Any]],
                  mock_indexes: List[Dict[str, Any]]) -> Tuple[List[Dict[str, Any]], bool]:
 
+    # ===== 方案1: 优先使用新浪接口 =====
     try:
-        # 获取所有主要指数系列数据并合并
+        # 收集需要查询的代码
+        sina_codes = [dct["code"] for dct in watch_indexes]
+        
+        # 调用新浪接口
+        sina_data = _sina_realtime_quote(sina_codes)
+        
+        if sina_data:
+            out: List[Dict[str, Any]] = []
+            for dct in watch_indexes:
+                code = dct["code"]
+                data = sina_data.get(code)
+                
+                if data:
+                    out.append({
+                        "name": dct["name"],
+                        "code": code,
+                        "close": data.get("price", 0.0),
+                        "change_pct": data.get("change_pct", 0.0),
+                        "turnover_billion": roundToInt(data.get("amount", 0) / 1e8),
+                        "volume": data.get("volume", 0.0),
+                        "amplitude": 0.0,  # 新浪接口无振幅数据
+                        "volume_ratio": 0.0,  # 新浪接口无量比数据
+                    })
+                else:
+                    logging.warning(f"新浪接口未找到指数: {code}")
+            
+            if out:
+                logging.info("指数数据获取成功 (新浪接口)")
+                return out, False
+    except Exception as e:
+        logging.warning("新浪指数接口失败: %s", e)
+
+    # ===== 方案2: 东方财富接口备用 =====
+    try:
+        logging.info("尝试使用东方财富接口获取指数数据...")
         all_index_data = []
         index_series = ["沪深重要指数", "上证系列指数", "深证系列指数", "中证系列指数"]
         
@@ -204,54 +362,48 @@ def buildIndexes(watch_indexes: List[Dict[str, Any]],
             except Exception:
                 continue
         
-        if not all_index_data:
-            raise RuntimeError("无法获取任何指数数据")
-        
-        # 合并并去重
-        idx_df = pd.concat(all_index_data, ignore_index=True).drop_duplicates(subset=["代码"])
-        
-        # 创建代码到数据的映射，提高查找效率
-        code_to_data = {}
-        for _, row in idx_df.iterrows():
-            code = str(row["代码"]).strip()
-            if code:
-                code_to_data[code] = row
-        
-        out: List[Dict[str, Any]] = []
-        for dct in watch_indexes:
-            code = dct["code"]
+        if all_index_data:
+            idx_df = pd.concat(all_index_data, ignore_index=True).drop_duplicates(subset=["代码"])
             
-            # 查找匹配的数据
-            row = code_to_data.get(code)
+            code_to_data = {}
+            for _, row in idx_df.iterrows():
+                code = str(row["代码"]).strip()
+                if code:
+                    code_to_data[code] = row
+            
+            out: List[Dict[str, Any]] = []
+            for dct in watch_indexes:
+                code = dct["code"]
+                row = code_to_data.get(code)
 
-            # 若未直接匹配到，尝试模糊匹配（部分代码包含关系）
-            if row is None:
-                # 模糊匹配
-                for k, v in code_to_data.items():
-                    if code in k or k in code:
-                        row = v
-                        break
                 if row is None:
-                    logging.warning(f"未找到指数代码: {code}")
-                    continue
+                    for k, v in code_to_data.items():
+                        if code in k or k in code:
+                            row = v
+                            break
+                    if row is None:
+                        continue
+                
+                out.append({
+                    "name": dct["name"],
+                    "code": code,
+                    "close": toFloatMaybe(row.get("最新价")) or 0.0,
+                    "change_pct": toFloatMaybe(row.get("涨跌幅")) or 0.0,
+                    "turnover_billion": roundToInt((toFloatMaybe(row.get("成交额")) or 0.0) / 1e8),
+                    "volume": toFloatMaybe(row.get("成交量")) or 0.0,
+                    "amplitude": toFloatMaybe(row.get("振幅")) or 0.0,
+                    "volume_ratio": toFloatMaybe(row.get("量比")) or 0.0,
+                })
             
-            # 提取数据并构建输出
-            out.append({
-                "name": dct["name"],
-                "code": code,
-                "close": toFloatMaybe(row.get("最新价")) or 0.0,
-                "change_pct": toFloatMaybe(row.get("涨跌幅")) or 0.0,
-                "turnover_billion": roundToInt((toFloatMaybe(row.get("成交额")) or 0.0) / 1e8),
-                "volume": toFloatMaybe(row.get("成交量")) or 0.0,
-                "amplitude": toFloatMaybe(row.get("振幅")) or 0.0,
-                "volume_ratio": toFloatMaybe(row.get("量比")) or 0.0,
-            })
-        
-        return out, False
-    
-    except Exception as e:  # noqa: BLE001
-        logging.warning("指数获取失败，使用mock: %s", e)
-        return mock_indexes, True
+            if out:
+                logging.info("指数数据获取成功 (东方财富接口备用)")
+                return out, False
+    except Exception as e:
+        logging.warning("东方财富指数接口也失败: %s", e)
+
+    # ===== 方案3: 使用 mock 数据 =====
+    logging.warning("所有指数接口均失败，使用mock数据")
+    return mock_indexes, True
 
 """功能: 统计全 A 股涨跌家数与活跃度。
 输入参数为: mock_up_down 为回退数据。
@@ -310,6 +462,7 @@ def buildUpDown(mock_up_down: Dict[str, Any]) -> Tuple[Dict[str, Any], bool]:
 """功能: 生成风格ETF涨跌数据。
 参数: watch_styles 为监控清单, mock_styles 为回退数据。
 返回: (风格数据列表, 是否使用回退)。
+支持新浪接口备用：优先东方财富，失败时用新浪。
 """
 def buildStyles(watch_styles: List[Dict[str, Any]], mock_styles: List[Dict[str, Any]]) -> Tuple[List[Dict[str, Any]], bool]:
 
@@ -321,12 +474,13 @@ def buildStyles(watch_styles: List[Dict[str, Any]], mock_styles: List[Dict[str, 
         
         for style_item in watch_styles:
             code = style_item["code"]
+            sina_code = style_item.get("sina_code")  # 从配置读取新浪代码
             
-            # 使用 getSpecificEtfChangePct 获取ETF涨跌幅
-            pct_value = getSpecificEtfChangePct(code)
+            # 使用 getSpecificEtfChangePct 获取ETF涨跌幅（含新浪备用）
+            pct_value = getSpecificEtfChangePct(code, sina_code)
             
             if pct_value is None:
-                print(f'记录未找到的代码{code}\n')
+                logging.warning(f'风格ETF未找到: {code}')
                 missing_codes.append(code)
                 pct_value = 0.0
             else:
@@ -354,40 +508,70 @@ def buildStyles(watch_styles: List[Dict[str, Any]], mock_styles: List[Dict[str, 
 
 
 """功能: 生成行业与主题ETF及龙头个股涨跌数据。
-参数: a_spot 为A股快照(来自ak.stock_zh_a_spot_em), watch_sectors 为监控清单, mock_sectors 为回退数据。
+参数: a_spot 为A股快照(来自ak.stock_zh_a_spot_em或新浪备用), watch_sectors 为监控清单, mock_sectors 为回退数据。
 返回: (行业主题列表, 是否使用回退)。
+支持新浪接口备用：ETF和龙头股均可从新浪获取。
 """
 def buildSectors(a_spot: Any, watch_sectors: List[Dict[str, Any]], mock_sectors: List[Dict[str, Any]]) -> Tuple[List[Dict[str, Any]], bool]:
 
     try:
-        if a_spot is None:
-            raise RuntimeError("A股快照为空")
-        
-        # 根据akshare官方接口的列名进行匹配
-        a_name_col = firstCol(a_spot, ["名称"]) or "名称"
-        a_pct_col = firstCol(a_spot, ["涨跌幅"]) or "涨跌幅"
-
+        # 构建龙头股名称到涨跌幅的映射
         a_map: Dict[str, float] = {}
-        for _, r in a_spot.iterrows():
-            n = str(r.get(a_name_col, "")).strip()
-            v = toFloatMaybe(r.get(a_pct_col))
-            if n:
-                a_map[n] = float(v or 0.0)
+        
+        # 从 a_spot DataFrame 读取（东方财富或新浪备用数据）
+        if a_spot is not None and hasattr(a_spot, 'iterrows'):
+            a_name_col = firstCol(a_spot, ["名称"]) or "名称"
+            a_pct_col = firstCol(a_spot, ["涨跌幅"]) or "涨跌幅"
+            for _, r in a_spot.iterrows():
+                n = str(r.get(a_name_col, "")).strip()
+                v = toFloatMaybe(r.get(a_pct_col))
+                if n:
+                    a_map[n] = float(v or 0.0)
+        
+        # 如果 a_spot 为空，直接从新浪获取所有龙头股数据
+        if not a_map:
+            logging.info("A股快照为空，直接从新浪获取龙头股数据...")
+            all_leader_codes = []
+            leader_code_to_name = {}
+            for s in watch_sectors:
+                for leader in s.get("leaders", []):
+                    # 支持新格式 {"name": "xxx", "sina_code": "shxxxxxx"}
+                    if isinstance(leader, dict):
+                        sina_code = leader.get("sina_code")
+                        name = leader.get("name")
+                        if sina_code and name:
+                            all_leader_codes.append(sina_code)
+                            leader_code_to_name[sina_code] = name
+            
+            if all_leader_codes:
+                sina_data = _sina_realtime_quote(all_leader_codes)
+                for code, data in sina_data.items():
+                    name = leader_code_to_name.get(code, data.get("name", ""))
+                    if name:
+                        a_map[name] = data.get("change_pct", 0.0)
 
         out: List[Dict[str, Any]] = []
         for s in watch_sectors:
-            #ETF信息 - 使用 getSpecificEtfChangePct 获取ETF涨跌幅
+            # ETF信息 - 使用 getSpecificEtfChangePct 获取ETF涨跌幅（含新浪备用）
             code = s["code"]
-            change_pct = getSpecificEtfChangePct(code)
+            sina_code = s.get("sina_code")
+            change_pct = getSpecificEtfChangePct(code, sina_code)
             if change_pct is None:
-                print(f'记录未找到的代码{code}\n')
+                logging.warning(f'行业ETF未找到: {code}')
                 change_pct = 0.0
             
-            #龙头信息
+            # 龙头信息 - 支持新旧两种格式
             leaders = []
-            for ln in s.get("leaders", []):
-                pct = float(a_map.get(str(ln).strip(), 0.0))
-                leaders.append({"name": ln, "change_pct": pct})
+            for leader in s.get("leaders", []):
+                if isinstance(leader, dict):
+                    # 新格式: {"name": "xxx", "sina_code": "shxxxxxx"}
+                    name = leader.get("name", "")
+                    pct = float(a_map.get(name, 0.0))
+                    leaders.append({"name": name, "change_pct": pct})
+                else:
+                    # 旧格式: 直接是字符串名称
+                    pct = float(a_map.get(str(leader).strip(), 0.0))
+                    leaders.append({"name": leader, "change_pct": pct})
                 
             out.append({
                 "etf_name": s["etf_name"],
@@ -522,25 +706,35 @@ def getCryptoChangePct(code: str) -> Optional[float]:
 
     return  getUsStockChangePct(code)
 
-def getSpecificEtfChangePct(code: str) -> Optional[float]:
-    """功能: 使用 ak.fund_etf_hist_em 获取特定ETF(如 518880/511090) 最新一日涨跌幅(%)。
-    参数: code (ETF代码)。返回: 浮点数涨跌幅或 None(获取失败)。
+def getSpecificEtfChangePct(code: str, sina_code: str = None) -> Optional[float]:
+    """功能: 获取特定ETF最新一日涨跌幅(%)。
+    优先使用新浪接口（更稳定），失败时使用东方财富接口备用。
+    参数: code (ETF代码), sina_code (新浪代码，可选)。
+    返回: 浮点数涨跌幅或 None(获取失败)。
     """
+    # ===== 方案1: 优先使用新浪接口 =====
+    target_sina_code = sina_code or _convert_code_to_sina(code)
     try:
-        if ak is None:
-            return None
-        df = ak.fund_etf_hist_em(symbol=code, adjust="qfq")
-        if df is None or getattr(df, "empty", True) or len(df) < 1:
-            print(f"ETF代码 {code} 获取历史数据失败")
-            return None
-        latest = df.iloc[-1]
-        change = toFloatMaybe(latest.get("涨跌幅"))
-        if change is None:
-            return None
-        return float(change)
-    except Exception as e:  # noqa: BLE001
-        logging.warning(f"获取特定ETF {code} 涨跌幅失败: {e}")
-        return None
+        sina_data = _sina_realtime_quote([target_sina_code])
+        if target_sina_code in sina_data:
+            return sina_data[target_sina_code].get("change_pct", 0.0)
+    except Exception as e:
+        logging.debug(f"新浪ETF {target_sina_code} 接口失败: {e}")
+    
+    # ===== 方案2: 东方财富接口备用 =====
+    try:
+        if ak is not None:
+            df = ak.fund_etf_hist_em(symbol=code, adjust="qfq")
+            if df is not None and not getattr(df, "empty", True) and len(df) >= 1:
+                latest = df.iloc[-1]
+                change = toFloatMaybe(latest.get("涨跌幅"))
+                if change is not None:
+                    return float(change)
+    except Exception as e:
+        logging.debug(f"东方财富ETF {code} 接口也失败: {e}")
+    
+    logging.warning(f"ETF {code} 所有接口均失败")
+    return None
 
 def buildRisks(watch_risks: List[Dict[str, Any]], mock_risks: List[Dict[str, Any]]) -> Tuple[List[Dict[str, Any]], bool]:
     """功能: 汇总风险偏好与风险锚指标。
@@ -653,12 +847,54 @@ def fetch_all_data() -> Dict[str, Any]:
     # 日期
     report_date = lastTradeDateStr()
 
-    # 拉取批量快照 东方财富网-沪深京 A 股-实时行情数据
+    # 拉取龙头股数据：优先使用新浪接口（更稳定）
+    a_spot = None
+    
+    # ===== 方案1: 优先使用新浪接口获取龙头股数据 =====
     try:
-        a_spot = ak.stock_zh_a_spot_em()
-    except Exception as e:  # noqa: BLE001
-        logging.warning("获取A股快照失败: %s", e)
-        a_spot = None
+        logging.info("使用新浪接口获取龙头股数据...")
+        # 从配置中读取龙头股的新浪代码（自动同步，无需手动维护）
+        codes_to_fetch = []
+        code_to_name = {}
+        
+        for sector in watch.SECTORS:
+            for leader in sector.get("leaders", []):
+                if isinstance(leader, dict):
+                    sina_code = leader.get("sina_code")
+                    name = leader.get("name")
+                    if sina_code and name:
+                        codes_to_fetch.append(sina_code)
+                        code_to_name[sina_code] = name
+        
+        if codes_to_fetch:
+            sina_data = _sina_realtime_quote(codes_to_fetch)
+            
+            if sina_data:
+                rows = []
+                for sina_code, name in code_to_name.items():
+                    if sina_code in sina_data:
+                        data = sina_data[sina_code]
+                        rows.append({
+                            "名称": name,
+                            "涨跌幅": data.get("change_pct", 0.0),
+                        })
+                
+                if rows:
+                    a_spot = pd.DataFrame(rows)
+                    logging.info("A股龙头股数据获取成功 (新浪接口), 共 %d 条", len(a_spot))
+    except Exception as e:
+        logging.warning("新浪接口获取龙头股失败: %s", e)
+    
+    # ===== 方案2: 东方财富接口备用 =====
+    if a_spot is None or (hasattr(a_spot, 'empty') and a_spot.empty):
+        try:
+            logging.info("尝试使用东方财富接口获取A股快照...")
+            a_spot = _retry_call(ak.stock_zh_a_spot_em, max_retries=2, delay_range=(1, 2), func_name="stock_zh_a_spot_em")
+            if a_spot is not None and not a_spot.empty:
+                logging.info("A股快照获取成功 (东方财富接口备用), 共 %d 条", len(a_spot))
+        except Exception as e:
+            logging.warning("东方财富A股快照也失败: %s", e)
+            a_spot = None
 
 
 
