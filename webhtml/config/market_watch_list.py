@@ -61,6 +61,7 @@ RISKS = [
 ]
 
 # 全球环境与关联市场
+# Yahoo Finance ticker
 GLOBALS = [
     {"category": "香港", "indicator": "恒生指数", "code": "^HSI"},
     {"category": "香港", "indicator": "恒生科技指数", "code": "HSTECH.HK"},

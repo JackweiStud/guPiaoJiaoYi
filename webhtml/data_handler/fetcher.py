@@ -740,29 +740,93 @@ def buildRisks(watch_risks: List[Dict[str, Any]], mock_risks: List[Dict[str, Any
     """功能: 汇总风险偏好与风险锚指标。
     参数: watch_risks 为监控清单, mock_risks 为回退数据。
     返回: (风险列表, 是否使用回退)。
+    批量获取 yfinance 数据避免限流。
     """
     try:
-        # 逐项构建，单项失败仅回退该项
-        out: List[Dict[str, Any]] = []
         mock_map = {m.get("code"): m for m in mock_risks}
-
+        
+        # 分离国内ETF和全球资产
+        domestic_etf_codes = []  # 国内ETF（用新浪）
+        global_tickers = []       # 全球资产（用yfinance批量）
+        code_to_ticker = {}       # 代码到ticker的映射
+        
+        for r in watch_risks:
+            code = r["code"]
+            if code == "GLOBAL_COMEX_GOLD":
+                global_tickers.append("GC=F")
+                code_to_ticker[code] = "GC=F"
+            elif code == "US10Y":
+                global_tickers.append("^TNX")
+                code_to_ticker[code] = "^TNX"
+            elif code == "YINN":
+                global_tickers.append("YINN")
+                code_to_ticker[code] = "YINN"
+            else:
+                domestic_etf_codes.append(code)
+        
+        # 批量获取全球资产（yfinance，带重试）
+        global_pct_map: Dict[str, float] = {}
+        if global_tickers and yf is not None:
+            for attempt in range(6):  # 最多重试3次
+                try:
+                    if attempt > 0:
+                        wait_time = 10 * attempt  # 递增等待: 10s, 20s
+                        logging.info(f"yfinance 限流，等待 {wait_time} 秒后重试...")
+                        time.sleep(wait_time)
+                    
+                    logging.info(f"批量获取全球风险资产: {global_tickers}")
+                    data = yf.download(
+                        tickers=global_tickers,
+                        period="5d",
+                        progress=False,
+                        auto_adjust=True,
+                        threads=False,
+                    )
+                    
+                    if data is not None and not data.empty:
+                        for ticker in global_tickers:
+                            try:
+                                if len(global_tickers) == 1:
+                                    closes = data['Close'].dropna()
+                                else:
+                                    closes = data['Close'][ticker].dropna()
+                                
+                                if len(closes) >= 2:
+                                    prev_close = closes.iloc[-2]
+                                    last_close = closes.iloc[-1]
+                                    if prev_close > 0:
+                                        pct = ((last_close - prev_close) / prev_close) * 100
+                                        global_pct_map[ticker] = float(pct)
+                            except Exception:
+                                continue
+                        
+                        if global_pct_map:
+                            logging.info(f"全球风险资产获取成功: {len(global_pct_map)}/{len(global_tickers)} 个")
+                            break  # 成功则退出重试循环
+                except Exception as e:
+                    logging.warning(f"yfinance 第 {attempt+1} 次尝试失败: {e}")
+            
+            if not global_pct_map:
+                logging.warning("yfinance 所有重试失败，全球风险资产使用 mock 数据")
+        
+        # 构建输出
+        out: List[Dict[str, Any]] = []
         for r in watch_risks:
             code = r["code"]
             val: Optional[float] = None
 
-            try:
-                if code == "GLOBAL_COMEX_GOLD":
-                    val = getComexGoldChangePct() 
-                elif code == "US10Y":
-                    val = getUsStockChangePct("^TNX")
-                elif code == "YINN":
-                    val = getUsStockChangePct("YINN")
-                else:
-                    val = getSpecificEtfChangePct(code)
-                    print(f'{code} 涨幅：{val} \n')
-            except Exception:
-                val = None
+            # 获取数据
+            if code in code_to_ticker:
+                # 全球资产从批量结果获取
+                ticker = code_to_ticker[code]
+                val = global_pct_map.get(ticker)
+            else:
+                # 国内ETF用新浪接口
+                val = getSpecificEtfChangePct(code)
+                if val is not None:
+                    logging.info(f'{code} 涨幅：{val:.2f}%')
 
+            # 失败则用 mock
             if val is None:
                 mv = mock_map.get(code, {})
                 val = toFloatMaybe(mv.get("value_or_change", 0.0)) or 0.0
@@ -772,7 +836,7 @@ def buildRisks(watch_risks: List[Dict[str, Any]], mock_risks: List[Dict[str, Any
                 "name": r["name"],
                 "code": code,
                 "value_or_change": float(val or 0.0),
-                "interpretation": str(mock_map.get(code, {}).get("interpretation", "")), #市场解读说明，帮助用户理解数据背后的市场含义
+                "interpretation": str(mock_map.get(code, {}).get("interpretation", "")),
             })
 
         return out, False
@@ -782,31 +846,78 @@ def buildRisks(watch_risks: List[Dict[str, Any]], mock_risks: List[Dict[str, Any
 
 
 def buildGlobals(watch_globals: List[Dict[str, Any]], mock_globals: List[Dict[str, Any]]) -> Tuple[List[Dict[str, Any]], bool]:
-    """功能: 汇总全球与关联圈指标(仅使用 yfinance 获取，且不使用兜底)。
-    参数: watch_globals 为监控清单, mock_globals 参数保留但不使用。
+    """功能: 汇总全球与关联圈指标(使用 yfinance 批量获取，避免限流)。
+    参数: watch_globals 为监控清单, mock_globals 为回退数据。
     返回: (全球关联列表, 是否回退)。
     """
     try:
+        if yf is None:
+            logging.warning("yfinance 不可用，使用mock数据")
+            return mock_globals, True
+        
+        # 构建 mock 映射
+        mock_map = {m.get("code"): m for m in mock_globals}
+        
+        # 收集所有需要查询的 ticker
+        tickers = [g["code"] for g in watch_globals]
+        logging.info(f"批量获取全球数据: {tickers}")
+        
+        # 批量下载数据（带重试机制，应对限流）
+        change_pct_map: Dict[str, float] = {}
+        for attempt in range(3):  # 最多重试3次
+            try:
+                if attempt > 0:
+                    wait_time = 10 * attempt  # 递增等待: 10s, 20s
+                    logging.info(f"yfinance 限流，等待 {wait_time} 秒后重试...")
+                    time.sleep(wait_time)
+                
+                data = yf.download(
+                    tickers=tickers,
+                    period="5d",
+                    progress=False,
+                    auto_adjust=False,  # 与测试脚本保持一致
+                    threads=True,
+                )
+                
+                if data is not None and not data.empty:
+                    for ticker in tickers:
+                        try:
+                            if len(tickers) == 1:
+                                closes = data['Close']
+                            else:
+                                closes = data['Close'][ticker]
+                            
+                            # 不用 dropna，直接取最后两个有效值
+                            if closes is not None and len(closes) >= 2:
+                                last_close = closes.iloc[-1]
+                                prev_close = closes.iloc[-2]
+                                # 计算涨跌幅
+                                if pd.notna(last_close) and pd.notna(prev_close) and prev_close > 0:
+                                    pct = ((last_close - prev_close) / prev_close) * 100
+                                    change_pct_map[ticker] = float(pct)
+                                else:
+                                    # 数据存在但无法计算涨跌幅（休市/nan），记录为 0
+                                    change_pct_map[ticker] = 0.0
+                        except Exception:
+                            continue
+                    
+                    if change_pct_map:
+                        logging.info(f"批量获取成功: {len(change_pct_map)}/{len(tickers)} 个")
+                        break  # 成功则退出重试循环
+            except Exception as e:
+                logging.warning(f"yfinance 第 {attempt+1} 次尝试失败: {e}")
+        
+        if not change_pct_map:
+            logging.warning("yfinance 所有重试失败，全球数据使用 mock 数据")
+        
+        # 构建输出
         out: List[Dict[str, Any]] = []
         for g in watch_globals:
             code = g["code"]
             category = g["category"]
-
-            val: Optional[float] = None
-            try:
-                if category == "香港":
-                    val = getHkChangePct(code)
-                elif category == "美股":
-                    val = getUsStockChangePct(code)
-                elif category == "汇率":
-                    val = getFxChangePct(code)
-                elif category == "加密货币":
-                    val = getCryptoChangePct(code)
-            except Exception:
-                val = None
-
-             # 逐项构建，单项失败仅回退该项
-            mock_map = {m.get("code"): m for m in mock_globals}
+            
+            # 从批量结果获取，失败则用 mock
+            val = change_pct_map.get(code)
             if val is None:
                 mv = mock_map.get(code, {})
                 val = toFloatMaybe(mv.get("value_or_change", 0.0)) or 0.0
@@ -818,6 +929,7 @@ def buildGlobals(watch_globals: List[Dict[str, Any]], mock_globals: List[Dict[st
                 "value_or_change": float(val or 0.0),
                 "interpretation": str(mock_map.get(code, {}).get("interpretation", "")),
             })
+        
         return out, False
     except Exception as e:  # noqa: BLE001
         logging.warning("全球与关联获取失败: %s", e)
