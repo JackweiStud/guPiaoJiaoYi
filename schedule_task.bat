@@ -83,7 +83,7 @@ goto :end
 :success
 echo.
 echo 任务详情:
-schtasks /query /tn "%TASK_NAME%" /fo list | findstr /i "任务名\|下次运行时间\|状态"
+schtasks /query /tn "%TASK_NAME%" /fo list | findstr /i "TaskName Next Run Time State"
 echo.
 echo 任务将在每天14:30:00自动运行
 echo 日志将保存到: %LOG_FILE%

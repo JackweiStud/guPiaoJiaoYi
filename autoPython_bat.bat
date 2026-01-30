@@ -3,8 +3,8 @@ chcp 65001 >nul
 setlocal enabledelayedexpansion
 
 :: 设置日志文件路径
-set "LOG_FILE=D:\code-touzi\gitHub\guPiaoJiaoYi\auto_run.log"
 set "SCRIPT_DIR=%~dp0"
+set "LOG_FILE=%SCRIPT_DIR%auto_run.log"
 set "PYTHON_SCRIPT=%SCRIPT_DIR%autoProcess.py"
 
 :: 创建日志目录（如果不存在）
@@ -22,6 +22,12 @@ echo [%CURRENT_DATE% %CURRENT_TIME%] 检查Python环境... >> "%LOG_FILE%"
 set "PYTHON_CMD="
 
 :: 首先尝试特定安装路径
+if exist "D:\Programs\python\python.exe" (
+    set "PYTHON_CMD=D:\Programs\python\python.exe"
+    echo [%CURRENT_DATE% %CURRENT_TIME%] 找到Python: %PYTHON_CMD% >> "%LOG_FILE%"
+    goto :found_python
+)
+
 if exist "D:\Programs\Python\Python310\python.exe" (
     set "PYTHON_CMD=D:\Programs\Python\Python310\python.exe"
     echo [%CURRENT_DATE% %CURRENT_TIME%] 找到Python: %PYTHON_CMD% >> "%LOG_FILE%"
