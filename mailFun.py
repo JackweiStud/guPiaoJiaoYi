@@ -104,12 +104,17 @@ class EmailSender:
 
         server = None
         try:
-            # 根据配置选择是否使用SSL
+            # 根据配置选择是否使用SSL，设置超时时间
+            timeout = 30  # 30秒超时
+            
             if config.SMTP_CONFIGS.get(config.ACTIVE_SMTP_PROVIDER, {}).get('use_ssl', False):
-                 server = smtplib.SMTP_SSL(self.smtp_server, self.smtp_port)
+                server = smtplib.SMTP_SSL(self.smtp_server, self.smtp_port, timeout=timeout)
             else:
-                server = smtplib.SMTP(self.smtp_server, self.smtp_port)
+                server = smtplib.SMTP(self.smtp_server, self.smtp_port, timeout=timeout)
                 server.starttls()
+            
+            # 设置调试级别（生产环境可设为0）
+            server.set_debuglevel(0)
             
             server.login(self.sender_email, self.sender_password)
             server.sendmail(self.sender_email, all_recipients, message.as_string())
@@ -121,12 +126,29 @@ class EmailSender:
             print("1. 邮箱地址和密码/授权码是否正确。")
             print("2. 如果使用Gmail等，是否开启了2FA并使用了【应用专用密码】。")
             return False
+        except smtplib.SMTPServerDisconnected as e:
+            print(f"错误：SMTP服务器断开连接 -> {e}")
+            return False
+        except (ConnectionResetError, ConnectionAbortedError, BrokenPipeError) as e:
+            print(f"错误：网络连接被重置 -> {e}")
+            return False
+        except TimeoutError as e:
+            print(f"错误：连接超时 -> {e}")
+            return False
         except Exception as e:
             print(f"错误：发送邮件时发生未知错误 -> {e}")
             return False
         finally:
+            # 安全地关闭连接，避免 quit() 失败导致资源泄漏
             if server:
-                server.quit()
+                try:
+                    server.quit()
+                except Exception:
+                    # 如果 quit() 失败，尝试强制关闭底层 socket
+                    try:
+                        server.close()
+                    except Exception:
+                        pass
 
 
 def create_demo_image(path: str):

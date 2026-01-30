@@ -17,15 +17,17 @@ cd /d "%SCRIPT_DIR%"
 set "PYTHON_CMD="
 if exist "D:\Programs\python\python.exe" (
     set "PYTHON_CMD=D:\Programs\python\python.exe"
-) else if exist "D:\Programs\Python\Python310\python.exe" (
+    goto :found_python
+)
+if exist "D:\Programs\Python\Python310\python.exe" (
     set "PYTHON_CMD=D:\Programs\Python\Python310\python.exe"
-) else (
-    for %%i in (python python3 py) do (
-        %%i --version >nul 2>&1
-        if !errorlevel! equ 0 (
-            set "PYTHON_CMD=%%i"
-            goto :found_python
-        )
+    goto :found_python
+)
+for %%i in (python python3 py) do (
+    %%i --version >nul 2>&1
+    if !errorlevel! equ 0 (
+        set "PYTHON_CMD=%%i"
+        goto :found_python
     )
 )
 

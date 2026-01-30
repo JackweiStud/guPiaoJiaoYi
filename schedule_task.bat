@@ -2,24 +2,49 @@
 chcp 65001 >nul
 setlocal enabledelayedexpansion
 
-:: 设置变量
-set "TASK_NAME=AutoProcessDaily"
-set "TASK_DESCRIPTION=每天14:30:00自动运行autoProcess.py脚本"
-set "BAT_FILE=%~dp0autoPython_bat.bat"
+:: 设置变量  手动触发 schtasks /run /tn "AutoProcessDaily_1430"
+:: PC 已设置为北京时间，无需时区转换
+set "TASK_NAME_1=AutoProcessDaily_1430"
+set "TASK_NAME_2=AutoProcessDaily_1510"
+set "LOCAL_TIME_1=14:30:00"
+set "LOCAL_TIME_2=15:10:00"
+set "TASK_DESCRIPTION=每天北京时间 14:30 和 15:10 自动运行行情报告和交易脚本"
+set "BAT_FILE=%~dp0run_all_tasks.bat"
+set "WEBHTML_BAT=%~dp0run_webhtml.bat"
+set "AUTOPYTHON_BAT=%~dp0autoPython_bat.bat"
 set "LOG_FILE=%~dp0auto_run.log"
 
 echo ========================================
 echo 自动任务计划设置工具
 echo ========================================
+echo 将创建两个定时任务:
+echo   - %TASK_NAME_1% (北京时间 %LOCAL_TIME_1%)
+echo   - %TASK_NAME_2% (北京时间 %LOCAL_TIME_2%)
 echo.
 
 :: 检查批处理文件是否存在
-if not exist "%BAT_FILE%" (
-    echo 错误: 未找到批处理文件 %BAT_FILE%
-    echo 请确保此脚本与autoPython_bat.bat在同一目录
+if not exist "%WEBHTML_BAT%" (
+    echo 错误: 未找到批处理文件 %WEBHTML_BAT%
     pause
     exit /b 1
 )
+if not exist "%AUTOPYTHON_BAT%" (
+    echo 错误: 未找到批处理文件 %AUTOPYTHON_BAT%
+    pause
+    exit /b 1
+)
+
+:: 创建一个汇总运行的批处理文件
+set "SCRIPT_DIR=%~dp0"
+echo @echo off > "%BAT_FILE%"
+echo chcp 65001 ^>nul >> "%BAT_FILE%"
+echo cd /d "%SCRIPT_DIR:~0,-1%" >> "%BAT_FILE%"
+echo echo [%%DATE%% %%TIME%%] 开始执行汇总任务 ^>^> "%LOG_FILE%" >> "%BAT_FILE%"
+echo call "%WEBHTML_BAT%" >> "%BAT_FILE%"
+echo echo [%%DATE%% %%TIME%%] webhtml任务执行完毕 ^>^> "%LOG_FILE%" >> "%BAT_FILE%"
+echo call "%AUTOPYTHON_BAT%" >> "%BAT_FILE%"
+echo echo [%%DATE%% %%TIME%%] 所有任务执行完毕 ^>^> "%LOG_FILE%" >> "%BAT_FILE%"
+
 
 :: 检查是否以管理员权限运行
 net session >nul 2>&1
@@ -32,66 +57,61 @@ if %errorlevel% neq 0 (
 )
 
 echo 正在设置计划任务...
-echo 任务名称: %TASK_NAME%
-echo 任务描述: %TASK_DESCRIPTION%
 echo 批处理文件: %BAT_FILE%
 echo 日志文件: %LOG_FILE%
 echo.
 
 :: 删除已存在的同名任务（如果存在）
 echo 检查并删除已存在的同名任务...
-schtasks /delete /tn "%TASK_NAME%" /f >nul 2>&1
+schtasks /delete /tn "%TASK_NAME_1%" /f >nul 2>&1
+schtasks /delete /tn "%TASK_NAME_2%" /f >nul 2>&1
+:: 同时删除旧的单任务（如果存在）
+schtasks /delete /tn "AutoProcessDaily" /f >nul 2>&1
 
-:: 尝试方法1：使用当前用户创建任务
-echo 尝试方法1：使用当前用户创建任务...
-schtasks /create /tn "%TASK_NAME%" /tr "%BAT_FILE%" /sc daily /st 14:30:00 /f
+:: ===== 创建第一个任务 (14:30) =====
+echo.
+echo 创建任务 1: %TASK_NAME_1% (%LOCAL_TIME_1%)...
+schtasks /create /tn "%TASK_NAME_1%" /tr "%BAT_FILE%" /sc daily /st %LOCAL_TIME_1% /f
 
-:: 检查方法1是否成功
 if %errorlevel% equ 0 (
-    echo.
-    echo ✅ 计划任务创建成功！（使用当前用户权限）
-    goto :success
+    echo ✅ 任务 %TASK_NAME_1% 创建成功！
+) else (
+    echo ❌ 任务 %TASK_NAME_1% 创建失败！
 )
 
-:: 如果方法1失败，尝试方法2：使用SYSTEM权限
-echo 方法1失败，尝试方法2：使用SYSTEM权限...
-schtasks /create /tn "%TASK_NAME%" /tr "%BAT_FILE%" /sc daily /st 14:30:00 /f /rl highest /ru "SYSTEM" /s localhost
+:: ===== 创建第二个任务 (15:10) =====
+echo.
+echo 创建任务 2: %TASK_NAME_2% (%LOCAL_TIME_2%)...
+schtasks /create /tn "%TASK_NAME_2%" /tr "%BAT_FILE%" /sc daily /st %LOCAL_TIME_2% /f
 
-:: 检查方法2是否成功
 if %errorlevel% equ 0 (
-    echo.
-    echo ✅ 计划任务创建成功！（使用SYSTEM权限）
-    goto :success
+    echo ✅ 任务 %TASK_NAME_2% 创建成功！
+) else (
+    echo ❌ 任务 %TASK_NAME_2% 创建失败！
 )
 
-:: 如果两种方法都失败
+:: 显示任务详情
 echo.
-echo ❌ 计划任务创建失败！
-echo 错误代码: %errorlevel%
+echo ========================================
+echo 任务创建完成！
+echo ========================================
 echo.
-echo 可能的原因：
-echo 1. 系统策略限制计划任务创建
-echo 2. 需要更高的系统权限
-echo 3. 系统组件损坏
+echo 任务 1 详情:
+schtasks /query /tn "%TASK_NAME_1%" /fo list 2>nul | findstr /i "TaskName Next"
 echo.
-echo 建议使用GUI方式创建任务：
-echo 1. 按Win+R，输入taskschd.msc
-echo 2. 手动创建基本任务
+echo 任务 2 详情:
+schtasks /query /tn "%TASK_NAME_2%" /fo list 2>nul | findstr /i "TaskName Next"
 echo.
-goto :end
-
-:success
-echo.
-echo 任务详情:
-schtasks /query /tn "%TASK_NAME%" /fo list | findstr /i "TaskName Next Run Time State"
-echo.
-echo 任务将在每天14:30:00自动运行
 echo 日志将保存到: %LOG_FILE%
 echo.
 echo 提示: 你可以通过以下命令查看任务状态:
-echo   schtasks /query /tn "%TASK_NAME%"
+echo   schtasks /query /tn "%TASK_NAME_1%"
+echo   schtasks /query /tn "%TASK_NAME_2%"
+echo.
+echo 手动触发任务:
+echo   schtasks /run /tn "%TASK_NAME_1%"
+echo   schtasks /run /tn "%TASK_NAME_2%"
 echo.
 
-:end
 echo 按任意键退出...
-pause >nul 
+pause >nul

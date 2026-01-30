@@ -49,7 +49,9 @@ def main() -> None:
     logging.info(f"报告已生成: {output_path}")
 
     # 邮件发送默认关闭，按 settings.SEND_MAIL 控制
+    logging.info(f"报告邮件准备中，SEND_MAIL is {settings.SEND_MAIL}")
     if settings.SEND_MAIL:
+       
         # 获取当前时间，格式化为 HH:MM
         current_time = datetime.now().strftime("%H:%M")
         subject = f"{current_time} 金融行情早晚报"
@@ -62,6 +64,8 @@ def main() -> None:
         )
         ok = send_report_mail(subject=subject, body=body, html_path=output_path)
         logging.info(f"报告邮件发送结果: {'成功' if ok else '失败'}")
+    
+    logging.info(f"运行完成")
 
 if __name__ == "__main__":
     main()
