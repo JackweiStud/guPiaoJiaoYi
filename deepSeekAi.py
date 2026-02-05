@@ -224,8 +224,7 @@ def extract_position_strategy(content: str) -> str:
     # 提取从开始标记到结尾的内容
     return content[start_pos:].strip()
 
-    def aiDeepSeekAnly(code):
-    
+def aiDeepSeekAnly(code):
     # 1. 配置参数
     config = DeepSeekConfig(
         api_key=os.getenv("DEEPSEEK_API_KEY") or "",
