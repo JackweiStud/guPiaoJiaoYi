@@ -62,7 +62,7 @@ DEFAULT_RECIPIENTS = {
 运行测试脚本验证配置是否正确：
 
 ```bash
-python test_qq_email.py
+python experiments/test_qq_email.py
 ```
 
 ## ⚙️ 技术配置详情
@@ -89,7 +89,7 @@ SMTP_CONFIGS = {
 
 ### 运行测试脚本
 ```bash
-python test_qq_email.py
+python experiments/test_qq_email.py
 ```
 
 ### 测试内容

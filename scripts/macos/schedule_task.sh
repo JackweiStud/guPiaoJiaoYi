@@ -55,7 +55,7 @@ fi
 if [ ! -d "$VENV_DIR" ]; then
     echo -e "${YELLOW}警告: 未找到虚拟环境: $VENV_DIR${NC}"
     echo -e "${YELLOW}请先运行: cd ${PROJECT_ROOT} && python3 -m venv venv${NC}"
-    echo -e "${YELLOW}然后安装依赖: source venv/bin/activate && pip install -r webhtml/requirements.txt${NC}"
+    echo -e "${YELLOW}然后安装依赖: source venv/bin/activate && pip install -r requirements.txt && pip install -r webhtml/requirements.txt${NC}"
     read -p "是否继续? (y/n): " -n 1 -r
     echo
     if [[ ! $REPLY =~ ^[Yy]$ ]]; then
@@ -104,7 +104,7 @@ create_plist() {
     <key>EnvironmentVariables</key>
     <dict>
         <key>PATH</key>
-        <string>/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
+        <string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
         <key>HOME</key>
         <string>${HOME}</string>
     </dict>

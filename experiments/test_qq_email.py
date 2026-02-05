@@ -116,15 +116,15 @@ def show_qq_email_setup_guide():
     print("   5. 点击'生成授权码'")
     print("   6. 复制生成的授权码（注意：不是QQ密码！）")
     
-    print("\n⚙️  步骤2: 修改配置文件")
-    print("   1. 编辑 config.py 文件")
-    print("   2. 将 ACTIVE_SMTP_PROVIDER 改为 'qq'")
-    print("   3. 在 SENDER_CREDENTIALS 中填写：")
-    print("      - email: 你的QQ邮箱地址")
-    print("      - password: 刚才获取的授权码")
+    print("\n⚙️  步骤2: 配置环境变量（推荐）")
+    print("   1. 编辑项目根目录的 .env 文件（或设置系统环境变量）")
+    print("   2. 添加以下配置：")
+    print("      - SMTP_PROVIDER=qq")
+    print("      - SMTP_SENDER_EMAIL=你的QQ邮箱地址")
+    print("      - SMTP_SENDER_PASSWORD=刚才获取的授权码")
     
     print("\n🧪 步骤3: 运行测试")
-    print("   运行命令: python test_qq_email.py")
+    print("   运行命令: python experiments/test_qq_email.py")
     
     print("\n⚠️  重要提醒:")
     print("   - 授权码不是QQ密码")
