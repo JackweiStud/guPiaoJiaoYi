@@ -7,6 +7,9 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PROJECT_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
 LOG_FILE="${PROJECT_ROOT}/logs/auto_run.log"
 
+# 确保日志目录存在
+mkdir -p "${PROJECT_ROOT}/logs"
+
 cd "$PROJECT_ROOT" || exit 1
 
 echo "[$(date '+%Y-%m-%d %H:%M:%S')] 开始执行汇总任务" >> "$LOG_FILE"

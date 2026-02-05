@@ -20,6 +20,9 @@ RUN_ALL_SCRIPT="${SCRIPT_DIR}/run_all_tasks.sh"
 LOG_FILE="${PROJECT_ROOT}/logs/auto_run.log"
 VENV_DIR="${PROJECT_ROOT}/venv"
 
+# 确保日志目录存在
+mkdir -p "${PROJECT_ROOT}/logs"
+
 # LaunchAgents 目录
 LAUNCH_AGENTS_DIR="${HOME}/Library/LaunchAgents"
 

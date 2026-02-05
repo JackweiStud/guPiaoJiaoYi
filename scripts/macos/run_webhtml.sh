@@ -9,6 +9,9 @@ PYTHON_SCRIPT="${PROJECT_ROOT}/webhtml/main.py"
 LOG_FILE="${PROJECT_ROOT}/logs/webhtml_run.log"
 VENV_DIR="${PROJECT_ROOT}/venv"
 
+# 确保日志目录存在
+mkdir -p "${PROJECT_ROOT}/logs"
+
 # 记录开始时间
 echo "[$(date '+%Y-%m-%d %H:%M:%S')] 开始执行 webhtml/main.py" > "$LOG_FILE"
 
