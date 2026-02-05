@@ -3,30 +3,32 @@
 统一任务运行入口 (报告生成/信号计算/自动任务).
 
 模式 (mode):
-  all       运行所有任务 (获取数据 -> 信号计算 -> 生成报告)  -strategy_params.json
+  all       运行所有任务 (获取数据 -> 信号计算 -> 生成报告)
   report    仅生成 HTML 报告并发送邮件
   signal    仅计算交易信号
   fetch     仅获取最新行情数据
-  auto      运行自动化交易处理流程
+  auto      运行自动化交易处理流程 (包含 AI 深度分析)
 
 常用示例:
-  ./venv/bin/python  run.py report                     # 生成报告
-  ./venv/bin/python  run.py signal --codes 159843      # 计算指定代码信号
-  ./venv/bin/python  run.py all --no-ai --no-mail      # 运行全部但不使用AI和发送邮件
-  ./venv/bin/python  run.py --list-codes               # 查看 strategy_params.json 中的代码列表
+  ./venv/bin/python run.py report                     # 生成 HTML 报表并发送邮件
+  ./venv/bin/python run.py signal --codes 159843      # 计算指定代码的交易信号
+  ./venv/bin/python run.py auto --codes 512820.SH     # 运行 AI 深度分析及自动化流程
+  ./venv/bin/python run.py all --no-ai --no-mail      # 运行全部任务，但禁用 AI 和邮件
+  ./venv/bin/python run.py --list-codes               # 查看 strategy_params.json 中的代码列表
   
-  常用示例（TG 机器人场景）:
-  ./venv/bin/python  run.py all --format json
-  ./venv/bin/python  run.py --codes 159843,512820 --format json
-  ./venv/bin/python  run.py signal --codes 159843,512820 --format json
+  ./venv/bin/python run.py auto --codes 512820.SH --no-mail-auto --format json
+
 
 
 参数说明:
-  --codes         指定代码，多个用逗号分隔 (如 159843,512820.SH)
-  --no-fetch      跳过数据抓取
-  --no-ai         禁用报告中的 AI 总结
-  --no-mail       禁用邮件发送
-  --list-codes    列出默认配置的所有代码并退出
+  --codes           指定代码，多个用逗号分隔 (如 159843,512820.SH)
+  --no-fetch        跳过数据抓取，直接使用本地缓存数据
+  --no-ai           禁用 HTML 报告中的 AI 市场总结
+  --no-mail         禁用 HTML 报告的邮件发送
+  --no-mail-auto    禁用自动化流程 (auto 模式) 的邮件发送
+  --format          输出格式: text (默认) 或 json (适合机器人集成)
+  --summary-file    将运行结果摘要保存到指定文件
+  --list-codes      列出当前配置的所有监控代码并退出
 """
 
 from __future__ import annotations
@@ -35,6 +37,10 @@ import argparse
 import json
 import os
 import sys
+from dotenv import load_dotenv
+
+# 加载环境变量
+load_dotenv()
 from datetime import datetime
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
@@ -124,8 +130,9 @@ def run_fetch(codes: List[str]) -> Dict[str, bool]:
 def run_signal(codes: List[str], fetch_first: bool) -> List[Dict[str, str]]:
     from autoProcess import get_trading_signal
 
+    fetch_results: Dict[str, bool] = {}
     if fetch_first:
-        run_fetch(codes)
+        fetch_results = run_fetch(codes)
 
     signals: List[Dict[str, str]] = []
     for code in codes:
@@ -135,24 +142,29 @@ def run_signal(codes: List[str], fetch_first: bool) -> List[Dict[str, str]]:
                 "code": code,
                 "signal": text,
                 "reason": reason,
+                "fetch_ok": fetch_results.get(code) if fetch_first else None,
             })
         except Exception as exc:
             signals.append({
                 "code": code,
                 "signal": "error",
                 "reason": f"signal failed: {exc}",
+                "fetch_ok": fetch_results.get(code) if fetch_first else None,
             })
     return signals
 
 
-def run_auto(codes: List[str]) -> List[Dict[str, str]]:
+def run_auto(codes: List[str], send_email: bool) -> List[Dict[str, str]]:
     from autoProcess import run_trading_strategy
 
     results: List[Dict[str, str]] = []
     for code in codes:
         try:
-            run_trading_strategy(code)
-            results.append({"code": code, "status": "ok"})
+            result = run_trading_strategy(code, send_email=send_email)
+            if isinstance(result, dict):
+                results.append(result)
+            else:
+                results.append({"code": code, "status": "ok"})
         except Exception as exc:
             results.append({"code": code, "status": f"error: {exc}"})
     return results
@@ -228,11 +240,23 @@ def main() -> int:
     parser.add_argument("--no-fetch", action="store_true", help="Skip data fetch before signal")
     parser.add_argument("--no-ai", action="store_true", help="Disable AI summary in report")
     parser.add_argument("--no-mail", action="store_true", help="Disable report email sending")
+    parser.add_argument("--no-mail-auto", action="store_true", help="Disable autoProcess email sending")
     parser.add_argument("--format", choices=["text", "json"], default="text", help="Summary output format")
     parser.add_argument("--summary-file", help="Write summary to a file")
     parser.add_argument("--list-codes", action="store_true", help="List default signal codes and exit")
 
     args = parser.parse_args()
+
+    payload: Dict = {
+        "generated_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        "mode": args.mode,
+        # Always echo the exact invocation for automation/audit (OpenClaw/TG).
+        "invocation": {
+            "python": sys.executable,
+            "cwd": os.getcwd(),
+            "argv": sys.argv,
+        },
+    }
 
     if args.list_codes:
         defaults = _default_codes_for_mode("signal")
@@ -242,11 +266,6 @@ def main() -> int:
     codes = _parse_codes(args.codes)
     if not codes and args.mode in ("signal", "fetch", "auto", "all"):
         codes = _default_codes_for_mode("auto" if args.mode == "auto" else "signal")
-
-    payload: Dict = {
-        "generated_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-        "mode": args.mode,
-    }
 
     if args.mode in ("report", "all"):
         payload["report"] = run_report(no_ai=args.no_ai, no_mail=args.no_mail)
@@ -258,7 +277,7 @@ def main() -> int:
         payload["fetch"] = run_fetch(codes)
 
     if args.mode == "auto":
-        payload["auto"] = run_auto(codes)
+        payload["auto"] = run_auto(codes, send_email=not args.no_mail_auto)
 
     _emit_summary(payload, fmt=args.format, summary_file=args.summary_file)
     return 0

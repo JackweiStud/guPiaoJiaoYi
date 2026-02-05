@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 '''
 背景：
     在stock_data文件下的存了ETF的分钟和日线数据，比如
@@ -9,12 +10,17 @@
 '''
 
 import os
+import sys
 import pandas as pd
 from pathlib import Path
 from typing import Optional, Dict, Any
 import httpx
 from pydantic import BaseModel, Field
 from tenacity import retry, stop_after_attempt, wait_exponential
+from dotenv import load_dotenv
+
+# 加载环境变量
+load_dotenv()
 
 class DeepSeekConfig(BaseModel):
     """深度求索API配置"""
@@ -87,9 +93,10 @@ class DeepSeekAnalyzer:
             data_sample = df.tail(80)
             data_str = data_sample.to_markdown()
             data_summary = f"数据时间范围：{df['DateTime'].min()} 至 {df['DateTime'].max()}"
-            print("content" + f"{data_summary}\n样本数据：\n{data_str}")
-            #print("user_prompt:" + f"{user_prompt}\n")
-
+            
+            # 仅打印最新的5条数据供调试参考
+            print(f"样本数据(仅展示最新5条)：\n{df.tail(5).to_markdown()}")
+            
             print("------------process_response 开始--------------------")
             print(f"开始调用DeepSeek API，超时设置：连接10s，读取300s")
 
@@ -99,8 +106,7 @@ class DeepSeekAnalyzer:
                 json={
                     "messages": [
                         {"role": "system", "content": self.config.system_prompt},
-                        #{"role": "user", "content": f"{user_prompt}\n{data_summary}\n样本数据：\n{data_str}"}
-                        {"role": "user", "content": f"{user_prompt}\n"}
+                        {"role": "user", "content": f"{user_prompt}\n{data_summary}\n样本数据：\n{data_str}"}
                     ],
                     "model": self.config.model,
                     "max_tokens": self.config.max_tokens,
@@ -110,7 +116,6 @@ class DeepSeekAnalyzer:
                     "response_format": {"type": "text"},
                     "stop": ["</分析结束>"]
                 }
-                # 移除timeout参数，使用httpx.Timeout配置
             )
             response.raise_for_status()
 
@@ -119,7 +124,6 @@ class DeepSeekAnalyzer:
 
             temp = self._process_response(response_data)
             print("------------_process_response 完成--------------------")
-            #print(temp)
 
             return temp
 
@@ -202,27 +206,19 @@ def extract_analysis_report(content: str) -> str:
         return content[start_pos:].strip()
 
 
-def extract_position_strategy(content: str) -> str:
-    """
-    从返回内容中提取持仓策略部分
-    提取从 "**持仓策略（目前100%仓位）**" 到结尾的内容
-    如果没有找到开始标记，则返回空字符串
-    """
-    if not content:
-        return ""
+def extract_position_strategy(ai_response):
+    """从AI响应中提取建议操作和仓位"""
+    import re
     
-    # 查找开始标记
-    start_marker = "**持仓策略（目前100%仓位）**"
+    # 提取建议操作
+    action_match = re.search(r"建议操作：\s*(\w+)", ai_response)
+    action = action_match.group(1) if action_match else "观望"
     
-    start_idx = content.find(start_marker)
-    if start_idx == -1:
-        return ""  # 没有找到开始标记，返回空字符串
+    # 提取仓位建议
+    pos_match = re.search(r"仓位建议：\s*(\d+)%", ai_response)
+    position = int(pos_match.group(1)) if pos_match else 0
     
-    # 从开始标记后开始提取到结尾
-    start_pos = start_idx + len(start_marker)
-    
-    # 提取从开始标记到结尾的内容
-    return content[start_pos:].strip()
+    return action, position
 
 def aiDeepSeekAnly(code):
     # 1. 配置参数
@@ -238,7 +234,6 @@ def aiDeepSeekAnly(code):
     dataPath = script_dir / "stock_data" / code / f"{code}_Day.csv"
     
     try:
-        #print(f"开始加载{code}数据文件：{dataPath}")
         df = loader.load_etf_data(file_path=dataPath)
         print(f"数据加载成功，共{len(df)}条记录")
     except FileNotFoundError:
@@ -252,8 +247,6 @@ def aiDeepSeekAnly(code):
     analyzer = DeepSeekAnalyzer(config)
 
     # 4. 执行分析
-    data_sample = df.tail(80)
-    data_str = data_sample.to_markdown()
     data_summary = f"数据时间范围：{df['DateTime'].min()} 至 {df['DateTime'].max()}"
 
     user_prompt = f"""
@@ -262,18 +255,6 @@ def aiDeepSeekAnly(code):
         1、股票的已按照日线排序后的日线输入数据如下
         <输入数据>
             某个股票的{data_summary}\n，最新80条样本数据
-            <stock_data>
-                {data_str}
-            </stock_data>
-
-        数据字段包括：
-            - 日期(DateTime)
-            - 开盘价(OpenValue)
-            - 收盘价(CloseValue)
-            - 最高价(HighValue)
-            - 最低价(LowValue)
-            - 成交量(Volume)
-            - 换手率(ChangeRate)
         </输入数据>
 
         2、请按以下步骤执行和分析：
@@ -309,32 +290,27 @@ def aiDeepSeekAnly(code):
                 ZD（中枢低点）= 重叠区间最低价 
                 ``` 
 
-            c) 买卖点判决：
-            第一类	趋势末端背驰点	MACD面积/高度背离 或 量能萎缩30%
-            第二类	第一类后的次级别回抽	回调不破前低/反弹不破前高
-            第三类	中枢突破回踩确认	回踩幅度＜中枢高度的1/3
-            扩展情形	中枢延伸≥9段时	按扩展中枢重新计算ZG/ZD
+            ### 3. 核心指标确认
+            在<核心指标>标签中计算：
+            - 均线系统：MA5, MA10, MA20, MA60 的排列及支撑/压力位
+            - MACD：DIF/DEA 轴位置、金叉/死叉、红绿柱变化、背离情况
+            - 量价关系：放量上涨/缩量回调等关键特征
 
-            ### 3. 技术指标计算
-            a) 均线系统：
-            - 计算5/8/16日EMA，标记金叉(5>8>16)或死叉(5<8<16)
-            - 计算20日平均Volume
-
-            b) MACD背驰验证：
-            - 对比相邻两段DIFF峰值和柱状面积
-
-            c) 动量指标：
-            - RSI超买(>70)/超卖(<30)持续时间
-            - 突破关键位时量能≥20日均量150%
-
-            ### 4. 市场情绪分析
-            - 量价比：上涨日/下跌日平均成交量比值
-            - 换手率：连续3日＞5%标记为异动
-            - 极端行情：单日涨跌幅＞7%且成交量创20日新高
+            ### 4. 交易建议生成
+            在<策略输出>标签中，根据上述分析给出结论：
+            - 当前趋势：(上涨/下跌/震荡)
+            - 核心逻辑：(如：日线底分型确立+MA20支撑+MACD底背离)
+            - 建议操作：(买入/卖出/持仓/观望)
+            - 仓位建议：(0-100%)
+            - 止损价位：(具体数值)
+            - 止盈目标：(具体数值)
         </分析步骤>
 
-
-        3、请严格按照如下格式进行markdown输出,输出规范如下
+        3、输出要求：
+        - 必须包含上述所有 XML 标签
+        - 语言精炼、专业，严禁废话
+        - 最终结论必须明确，不模棱两可
+        
         在<分析报告> 。。。 </分析报告>标签内按以下结构输出：
 
         <分析报告>
@@ -363,22 +339,11 @@ def aiDeepSeekAnly(code):
             操作建议：XX策略，[]加仓，止损XX@X%(对应当前最新收盘价的百分比)
             X日预期：看X概率X%（放量突破X确认），目标X（X%）
             风控提示：XXX
-
-            ```
         </分析报告>   
-
-
-
-        请先执行所有计算验证，确认无误后在<分析报告></分析报告>  标签输出最终结果。所有中间验证过程请记录在对应子标签中。
-
-              
-        """
+    """
 
     import time
     start_time = time.time()
-    
-    print(f"开始调用DeepSeek API分析{code}...")
-    print(f"超时配置：连接10s，读取300s，总超时320s")
     
     try:
         result = analyzer.analyze_data(df, user_prompt)
@@ -392,58 +357,30 @@ def aiDeepSeekAnly(code):
             
             if 'usage' in result and result['usage']:
                 print(f"Token消耗：输入{result['usage'].get('prompt_tokens', 'N/A')}，输出{result['usage'].get('completion_tokens', 'N/A')}")
-                total_tokens = result['usage'].get('total_tokens', 0)
-                if total_tokens > 8000:
-                    print("警告：接近token上限，建议简化请求")
-            else:
-                print("警告：未获取到Token使用信息")
-
-            print("--------------分析结果-------------------------")
+            
             analysis_report = extract_analysis_report(result["content"])
             
             if analysis_report:
-                print(f"{code}分析完成，已提取分析报告")
-                print(analysis_report)
+                print(f"{code}分析完成")
                 return analysis_report
             else:
-                print(f"{code}分析完成，但未提取到有效报告")
-                print(result["content"])
                 return result["content"]
         else:
-            print(f"{code}分析结果不完整")
-            print(f"原因：{result.get('reasoning_content', '未知')}")
-            
-            # 打印不完整result的详细信息
-            print("不完整Result详情:")
-            if isinstance(result, dict):
-                for key, value in result.items():
-                    if key == 'content':
-                        print(f"{key}: {str(value)[:100]}{'...' if len(str(value)) > 100 else ''}")
-                    else:
-                        print(f"{key}: {value}")
-            else:
-                print(f"  Result: {result}")
-            
+            print(f"{code}分析结果不完整: {result.get('reasoning_content', '未知')}")
             return ""
             
     except Exception as e:
-        end_time = time.time()
-        elapsed_time = end_time - start_time
         print(f"{code}分析过程中发生异常：{str(e)}")
-        print(f"异常发生时间：{elapsed_time:.2f}秒")
         return ""
 
 
 if __name__ == "__main__":
-    
-    #print("-----------561560---------------")
-    #aiDeepSeekAnly("561560")  # 直接调用同步函数
-    #print("---------588180-----------------")
-    #aiDeepSeekAnly("588180")
-    print("---------511090-----------------")
-    aiDeepSeekAnly("511090")
-    print("---------159843-----------------")
-    aiDeepSeekAnly("159843")
-
-
-    
+    if len(sys.argv) > 1:
+        code = sys.argv[1]
+        res = aiDeepSeekAnly(code)
+        print(res)
+    else:
+        print("---------511090-----------------")
+        aiDeepSeekAnly("511090")
+        print("---------159843-----------------")
+        aiDeepSeekAnly("159843")

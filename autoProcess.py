@@ -117,7 +117,7 @@ def build_signal_reason(etf_data, params):
 
     return f"信号来源说明：{', '.join(parts + triggers)}"
 
-def run_trading_strategy(stock_code):
+def run_trading_strategy(stock_code, send_email: bool = True):
     """
     执行完整的交易策略流程：获取数据、分析信号、发送邮件。
     """
@@ -146,14 +146,24 @@ def run_trading_strategy(stock_code):
         if not success:
             msg = f"在连续 {max_retries} 次尝试后仍未成功获取 {stock_code} 的ETF数据。"
             print(msg)
-            notify_error(f"ETF数据获取失败 for {stock_code}", msg)
-            return
+            if send_email:
+                notify_error(f"ETF数据获取失败 for {stock_code}", msg)
+            return {
+                "code": stock_code,
+                "status": "error",
+                "error": msg
+            }
 
     except Exception as e:
         print(f"错误：获取ETF数据失败（异常）。错误信息: {e}")
         # 如果数据获取失败，可以选择发送错误邮件或直接退出
-        notify_error(f"ETF数据获取失败 for {stock_code}", f"错误详情: {e}")
-        return
+        if send_email:
+            notify_error(f"ETF数据获取失败 for {stock_code}", f"错误详情: {e}")
+        return {
+            "code": stock_code,
+            "status": "error",
+            "error": f"获取ETF数据异常: {e}"
+        }
 
     # 2. 实现类似 testOnlyNew 的功能，分析交易信号
     print("\n[步骤 2/3] 正在分析交易信号...")
@@ -177,12 +187,23 @@ def run_trading_strategy(stock_code):
         print("AI分析结果为空，已添加默认提示信息")
 
     # 4. 根据交易信号发送邮件
-    print("\n[步骤 3/3] 正在准备发送邮件通知...")
-    notify_by_email(stock_code, signal_text, signal_reason, aiDataInfo, strategyinfo)
+    if send_email:
+        print("\n[步骤 3/3] 正在准备发送邮件通知...")
+        notify_by_email(stock_code, signal_text, signal_reason, aiDataInfo, strategyinfo)
+    else:
+        print("\n[步骤 3/3] 已配置为不发送邮件，跳过邮件通知。")
 
     print("\n" + "="*50)
     print("自动化流程执行完毕。")
     print("="*50)
+    return {
+        "code": stock_code,
+        "status": "ok",
+        "signal": signal_text,
+        "signal_reason": signal_reason,
+        "ai_strategy": strategyinfo,
+        "ai_analysis": aiDataInfo
+    }
 
 def get_trading_signal(stock_code):
     """

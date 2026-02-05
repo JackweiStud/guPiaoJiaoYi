@@ -1,5 +1,9 @@
 import sys
 import os
+from dotenv import load_dotenv
+
+# 加载环境变量
+load_dotenv()
 
 # 将项目根目录添加到 Python 模块搜索路径中（必须在所有导入之前）
 # 这使得脚本可以找到 webhtml 等模块
