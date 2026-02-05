@@ -89,3 +89,13 @@ MPLCONFIGDIR=/tmp/matplotlib-cache /Users/jackwl/Code/gitcode/guPiaoJiaoYi/venv/
 - TG 可直接转发 JSON，或抽取关键字段：
   - `signals[].signal` / `signals[].reason` / `signals[].fetch_ok`
   - `auto[].signal` / `auto[].signal_reason` / `auto[].ai_strategy` / `auto[].ai_analysis`
+
+## 用户可说的话（示例）
+
+- “检查下当前行情”
+- “生成今天的市场日报”
+- “看下 512810 的信号”
+- “给我 159843、512820 的信号”
+- “只要信号，不要发邮件”
+- “要 AI 分析，但别发邮件”
+- “网络不好，用本地数据先出结果”
