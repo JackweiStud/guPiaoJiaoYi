@@ -1,3 +1,4 @@
+import os
 import requests
 
 url = "https://api.siliconflow.cn/v1/chat/completions"
@@ -23,7 +24,7 @@ payload = {
     ]
 }
 headers = {
-    "Authorization": "Bearer sk-muzyalwgqothjfvsdmzfdjsuiszgqvbgzsvijfteyoesaxdy",
+    "Authorization": f"Bearer {os.getenv('DEEPSEEK_API_KEY', '')}",
     "Content-Type": "application/json"
 }
 

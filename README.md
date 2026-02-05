@@ -166,6 +166,66 @@ DEFAULT_RECIPIENTS = {
 }
 ```
 
+## 🔑 API 密钥配置
+
+**重要**：为了安全性，请使用环境变量而不是硬编码 API 密钥。
+
+### 设置环境变量
+
+**MacOS/Linux:**
+```bash
+# 临时设置（当前终端会话）
+export DEEPSEEK_API_KEY="your_deepseek_api_key_here"
+
+# 永久设置（添加到 ~/.bashrc 或 ~/.zshrc）
+echo 'export DEEPSEEK_API_KEY="your_deepseek_api_key_here"' >> ~/.zshrc
+source ~/.zshrc
+```
+
+**Windows:**
+```cmd
+# 设置环境变量
+set DEEPSEEK_API_KEY=your_deepseek_api_key_here
+
+# 永久设置（系统环境变量）
+setx DEEPSEEK_API_KEY "your_deepseek_api_key_here"
+```
+
+### 验证配置
+
+```bash
+# 检查环境变量是否设置
+echo $DEEPSEEK_API_KEY
+
+# Python 中验证
+python3 -c "import os; print(os.getenv('DEEPSEEK_API_KEY'))"
+```
+
+### 涉及的 API
+
+1. **DeepSeek AI** (`deepSeekAi.py`, `webhtml/config/settings.py`)
+   - 用途：股票数据分析、投资建议
+   - 环境变量：`DEEPSEEK_API_KEY`
+
+### 获取 API 密钥
+
+1. 访问 [硅基流动](https://siliconflow.cn/)
+2. 注册/登录账户
+3. 在控制台获取 API 密钥
+4. 将密钥设置为环境变量
+
+### 安全提醒
+
+⚠️ **切勿**：
+- 在代码中硬编码 API 密钥
+- 将密钥提交到版本控制系统
+- 在日志中打印密钥
+
+✅ **应该**：
+- 使用环境变量
+- 将密钥添加到 `.env` 文件并添加到 `.gitignore`
+- 定期轮换 API 密钥
+
 ## 🔧 故障排除
 
 ### 网络连接问题
