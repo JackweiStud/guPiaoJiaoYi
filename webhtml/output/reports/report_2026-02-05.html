@@ -1,0 +1,900 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>淮舟金融科技 · 全球金融行情日报</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        serif: ['Noto Serif SC', 'Georgia', 'serif'],
+                        sans: ['IBM Plex Sans', 'system-ui', 'sans-serif'],
+                        mono: ['IBM Plex Mono', 'monospace'],
+                    },
+                    colors: {
+                        dark: {
+                            900: '#0a0e17',
+                            800: '#0f172a',
+                            700: '#1e293b',
+                            600: '#334155',
+                        },
+                        gold: {
+                            400: '#fbbf24',
+                            500: '#f59e0b',
+                            600: '#d97706',
+                        },
+                        accent: '#f59e0b',
+                        up: '#22c55e',
+                        down: '#ef4444',
+                        text: {
+                            primary: '#f8fafc',
+                            secondary: '#94a3b8',
+                            muted: '#64748b',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        :root {
+            --color-up: #22c55e;
+            --color-down: #ef4444;
+            --color-accent: #f59e0b;
+            --color-gold: #fbbf24;
+        }
+        
+        * {
+            scrollbar-width: thin;
+            scrollbar-color: #334155 transparent;
+        }
+        
+        body {
+            font-family: 'IBM Plex Sans', system-ui, sans-serif;
+            background: #0a0e17;
+            min-height: 100vh;
+            color: #f8fafc;
+        }
+        
+        /* 背景网格效果 */
+        .bg-grid {
+            background-image: 
+                linear-gradient(rgba(245, 158, 11, 0.03) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(245, 158, 11, 0.03) 1px, transparent 1px);
+            background-size: 60px 60px;
+        }
+        
+        /* 顶部光晕 */
+        .top-glow {
+            position: fixed;
+            top: 0;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 80%;
+            height: 400px;
+            background: radial-gradient(ellipse at 50% 0%, rgba(245, 158, 11, 0.08) 0%, transparent 70%);
+            pointer-events: none;
+            z-index: 0;
+        }
+        
+        /* 报头样式 */
+        .masthead {
+            position: relative;
+        }
+        
+        .masthead::after {
+            content: '';
+            position: absolute;
+            bottom: 0;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 200px;
+            height: 2px;
+            background: linear-gradient(90deg, transparent, var(--color-gold), transparent);
+        }
+        
+        .masthead-title {
+            font-family: 'Noto Serif SC', Georgia, serif;
+            background: linear-gradient(135deg, #fbbf24 0%, #f59e0b 50%, #d97706 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        
+        /* 区块标题 */
+        .section-title {
+            font-family: 'Noto Serif SC', Georgia, serif;
+            position: relative;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.75rem;
+        }
+        
+        .section-title::before {
+            content: '';
+            width: 4px;
+            height: 1.25em;
+            background: linear-gradient(180deg, var(--color-gold), var(--color-accent));
+            border-radius: 2px;
+        }
+        
+        /* 数据单元格 */
+        .positive { color: var(--color-up); }
+        .negative { color: var(--color-down); }
+        
+        .data-cell {
+            font-family: 'IBM Plex Mono', monospace;
+            font-variant-numeric: tabular-nums;
+            letter-spacing: -0.02em;
+        }
+        
+        /* 玻璃卡片 */
+        .glass-card {
+            background: linear-gradient(135deg, rgba(30, 41, 59, 0.8) 0%, rgba(15, 23, 42, 0.9) 100%);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(251, 191, 36, 0.1);
+            border-radius: 16px;
+            box-shadow: 
+                0 4px 24px -4px rgba(0, 0, 0, 0.4),
+                0 0 0 1px rgba(255, 255, 255, 0.03) inset,
+                0 1px 0 rgba(255, 255, 255, 0.05) inset;
+            overflow: hidden;
+        }
+        
+        .glass-card-header {
+            background: linear-gradient(180deg, rgba(251, 191, 36, 0.05) 0%, transparent 100%);
+            border-bottom: 1px solid rgba(251, 191, 36, 0.1);
+        }
+        
+        /* 表格样式 */
+        .table-modern {
+            border-collapse: separate;
+            border-spacing: 0;
+        }
+        
+        .table-modern thead {
+            position: sticky;
+            top: 0;
+            z-index: 10;
+        }
+        
+        .table-modern thead tr {
+            background: linear-gradient(180deg, rgba(15, 23, 42, 0.98) 0%, rgba(15, 23, 42, 0.95) 100%);
+        }
+        
+        .table-modern thead th {
+            color: #94a3b8;
+            font-weight: 500;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            font-size: 0.7rem;
+            border-bottom: 1px solid rgba(251, 191, 36, 0.15);
+        }
+        
+        .table-modern tbody tr {
+            transition: all 0.2s ease;
+            border-bottom: 1px solid rgba(148, 163, 184, 0.08);
+        }
+        
+        .table-modern tbody tr:hover {
+            background: rgba(251, 191, 36, 0.04);
+        }
+        
+        .table-modern tbody tr:last-child {
+            border-bottom: none;
+        }
+        
+        /* 引用框 */
+        .quote-box {
+            position: relative;
+            padding: 1.5rem 2rem;
+            background: linear-gradient(135deg, rgba(245, 158, 11, 0.08) 0%, rgba(217, 119, 6, 0.04) 100%);
+            border-left: 3px solid var(--color-gold);
+            border-radius: 0 12px 12px 0;
+        }
+        
+        .quote-box::before {
+            content: '"';
+            position: absolute;
+            top: 0.5rem;
+            left: 1rem;
+            font-family: Georgia, serif;
+            font-size: 3rem;
+            color: rgba(251, 191, 36, 0.15);
+            line-height: 1;
+        }
+        
+        /* 统计高亮块 */
+        .stat-highlight {
+            display: inline-flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 1rem 1.5rem;
+            background: linear-gradient(135deg, rgba(245, 158, 11, 0.15) 0%, rgba(217, 119, 6, 0.1) 100%);
+            border: 1px solid rgba(251, 191, 36, 0.2);
+            border-radius: 12px;
+        }
+        
+        /* 市场标签 */
+        .badge-market {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            padding: 0.25rem 0.5rem;
+            font-size: 0.6rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            border-radius: 6px;
+        }
+        
+        .badge-hk { 
+            background: linear-gradient(135deg, #dc143c 0%, #b91c1c 100%);
+            box-shadow: 0 2px 8px rgba(220, 20, 60, 0.3);
+        }
+        .badge-us { 
+            background: linear-gradient(135deg, #1e40af 0%, #1e3a5f 100%);
+            box-shadow: 0 2px 8px rgba(30, 64, 175, 0.3);
+        }
+        .badge-fx { 
+            background: linear-gradient(135deg, #059669 0%, #047857 100%);
+            box-shadow: 0 2px 8px rgba(5, 150, 105, 0.3);
+        }
+        .badge-crypto { 
+            background: linear-gradient(135deg, #f97316 0%, #ea580c 100%);
+            box-shadow: 0 2px 8px rgba(249, 115, 22, 0.3);
+        }
+        
+        /* 装饰分隔线 */
+        .divider-ornate {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            color: var(--color-gold);
+        }
+        
+        .divider-ornate::before,
+        .divider-ornate::after {
+            content: '';
+            flex: 1;
+            height: 1px;
+            background: linear-gradient(90deg, transparent, rgba(251, 191, 36, 0.3), transparent);
+        }
+        
+        /* 日期徽章 */
+        .date-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.5rem 1rem;
+            background: linear-gradient(135deg, rgba(15, 23, 42, 0.9) 0%, rgba(30, 41, 59, 0.9) 100%);
+            border: 1px solid rgba(251, 191, 36, 0.2);
+            border-radius: 100px;
+            font-family: 'IBM Plex Mono', monospace;
+            font-size: 0.875rem;
+            color: var(--color-gold);
+        }
+        
+        /* 涨跌指示器 */
+        .change-indicator {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.25rem;
+        }
+        
+        .change-indicator.up::before {
+            content: '▲';
+            font-size: 0.6em;
+            color: var(--color-up);
+        }
+        
+        .change-indicator.down::before {
+            content: '▼';
+            font-size: 0.6em;
+            color: var(--color-down);
+        }
+        
+        /* 动画 */
+        @keyframes fadeInUp {
+            from { 
+                opacity: 0; 
+                transform: translateY(20px); 
+            }
+            to { 
+                opacity: 1; 
+                transform: translateY(0); 
+            }
+        }
+        
+        @keyframes shimmer {
+            0% { background-position: -200% 0; }
+            100% { background-position: 200% 0; }
+        }
+        
+        .animate-in {
+            animation: fadeInUp 0.6s ease-out forwards;
+        }
+        
+        .delay-1 { animation-delay: 0.1s; opacity: 0; }
+        .delay-2 { animation-delay: 0.2s; opacity: 0; }
+        .delay-3 { animation-delay: 0.3s; opacity: 0; }
+        .delay-4 { animation-delay: 0.4s; opacity: 0; }
+        
+        /* 发光文字 */
+        .glow-text {
+            text-shadow: 0 0 20px rgba(251, 191, 36, 0.3);
+        }
+        
+        /* 脉冲点 */
+        .pulse-dot {
+            position: relative;
+        }
+        
+        .pulse-dot::after {
+            content: '';
+            position: absolute;
+            top: 50%;
+            right: -0.75rem;
+            transform: translateY(-50%);
+            width: 6px;
+            height: 6px;
+            background: var(--color-up);
+            border-radius: 50%;
+            animation: pulse 2s ease-in-out infinite;
+        }
+        
+        @keyframes pulse {
+            0%, 100% { opacity: 1; transform: translateY(-50%) scale(1); }
+            50% { opacity: 0.5; transform: translateY(-50%) scale(1.2); }
+        }
+        
+        /* 打印样式 */
+        @media print {
+            body { 
+                background: white; 
+                color: #1a1a1a;
+            }
+            .glass-card { 
+                box-shadow: none; 
+                border: 1px solid #e5e5e5;
+                background: #fafafa;
+            }
+            .top-glow { display: none; }
+            .masthead-title {
+                -webkit-text-fill-color: #b8860b;
+            }
+        }
+        
+        /* 响应式减少动画 */
+        @media (prefers-reduced-motion: reduce) {
+            .animate-in {
+                animation: none;
+                opacity: 1;
+            }
+            .pulse-dot::after {
+                animation: none;
+            }
+        }
+    </style>
+</head>
+<body class="bg-grid">
+    <!-- 顶部光晕 -->
+    <div class="top-glow"></div>
+    
+    <div class="container mx-auto px-4 py-8 md:px-8 lg:px-12 max-w-6xl relative z-10">
+        
+        <!-- 报头 -->
+        <header class="masthead text-center mb-12 pb-8 animate-in">
+            <div class="flex items-center justify-center gap-4 mb-4">
+                <div class="h-px flex-1 max-w-[80px] bg-gradient-to-r from-transparent to-gold-500/30"></div>
+                <span class="text-gold-400/80 text-xs tracking-[0.4em] font-medium uppercase">Financial Daily Report</span>
+                <div class="h-px flex-1 max-w-[80px] bg-gradient-to-l from-transparent to-gold-500/30"></div>
+            </div>
+            
+            <h1 class="masthead-title text-4xl md:text-5xl lg:text-6xl font-bold mb-3 glow-text">
+                淮舟金融科技
+            </h1>
+            
+            <p class="text-text-secondary text-base md:text-lg tracking-wider mb-6">全球金融行情监控日报</p>
+            
+            <div class="date-badge">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
+                </svg>
+                <span>2026-02-05</span>
+            </div>
+        </header>
+
+        <!-- 今日点评 -->
+        <section class="mb-8 animate-in delay-1">
+            <div class="glass-card">
+                <div class="p-6 md:p-8">
+                    <div class="quote-box">
+                        <h2 class="section-title text-lg font-semibold text-text-primary mb-4">今日行情点评</h2>
+                        <p class="text-text-secondary leading-relaxed pl-6 text-sm md:text-base">今日市场呈现结构性调整，A股主要指数普遍收跌，创业板与科创板跌幅超1.4%，涨跌比仅30.6%显示内部分化显著。银行、医药、消费成为资金避险主线，新能源车、煤炭、有色领跌。风格偏向防御，低估值板块受青睐。
+
+外围市场波动收窄，港股微跌，美股持平，未对A股形成方向性指引。当前市场缺乏增量催化，风险偏好收缩迹象明显，需关注资金向稳增长主线集中的持续性。</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- A股市场温度 -->
+        <section class="mb-8 animate-in delay-2">
+            <div class="glass-card">
+                <div class="glass-card-header p-5 md:p-6">
+                    <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+                        <h2 class="section-title text-xl font-bold text-text-primary">A股市场温度</h2>
+                        <div class="stat-highlight">
+                            <span class="text-2xl md:text-3xl font-bold data-cell" style="color: #ef4444">
+                                1587 : 3462
+                            </span>
+                            <span class="text-xs text-text-secondary mt-1">分化</span>
+                            <span class="text-xs text-text-muted">活跃度 30.6%</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="table-modern w-full">
+                        <thead>
+                            <tr>
+                                <th class="p-4 text-left">指数名称</th>
+                                <th class="p-4 text-right">收盘点位</th>
+                                <th class="p-4 text-right">当日涨跌</th>
+                                <th class="p-4 text-right">成交额(亿)</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td class="p-4 font-medium text-text-primary">上证指数</td>
+                                <td class="p-4 text-right data-cell text-text-secondary">4075.92</td>
+                                <td class="p-4 text-right data-cell font-semibold negative">-0.64%</td>
+                                <td class="p-4 text-right data-cell text-text-muted">9470</td>
+                            </tr>
+                            <tr>
+                                <td class="p-4 font-medium text-text-primary">创业板指</td>
+                                <td class="p-4 text-right data-cell text-text-secondary">3260.28</td>
+                                <td class="p-4 text-right data-cell font-semibold negative">-1.55%</td>
+                                <td class="p-4 text-right data-cell text-text-muted">5523</td>
+                            </tr>
+                            <tr>
+                                <td class="p-4 font-medium text-text-primary">科创50指</td>
+                                <td class="p-4 text-right data-cell text-text-secondary">1432.52</td>
+                                <td class="p-4 text-right data-cell font-semibold negative">-1.44%</td>
+                                <td class="p-4 text-right data-cell text-text-muted">677</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+
+        <!-- 市场风格与规模 -->
+        <section class="mb-8 animate-in delay-3">
+            <div class="glass-card">
+                <div class="glass-card-header p-5 md:p-6">
+                    <h2 class="section-title text-xl font-bold text-text-primary">市场风格与规模</h2>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="table-modern w-full">
+                        <thead>
+                            <tr>
+                                <th class="p-4 text-left">分类</th>
+                                <th class="p-4 text-left">监控ETF</th>
+                                <th class="p-4 text-left">代码</th>
+                                <th class="p-4 text-right">当日涨跌</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                                <tr>
+                                    <td class="p-4 font-medium text-gold-400/90 align-top" rowspan="4">大规模/价值</td>
+                                    <td class="p-4 text-text-primary">上证50ETF</td>
+                                    <td class="p-4 data-cell text-text-muted text-sm">510050</td>
+                                    <td class="p-4 text-right data-cell font-semibold negative">-0.32%</td>
+                                </tr>
+                                <tr>
+                                    <td class="p-4 text-text-primary">沪深300ETF</td>
+                                    <td class="p-4 data-cell text-text-muted text-sm">510300</td>
+                                    <td class="p-4 text-right data-cell font-semibold negative">-0.59%</td>
+                                </tr>
+                                <tr>
+                                    <td class="p-4 text-text-primary">红利ETF</td>
+                                    <td class="p-4 data-cell text-text-muted text-sm">510880</td>
+                                    <td class="p-4 text-right data-cell font-semibold negative">-0.44%</td>
+                                </tr>
+                                <tr>
+                                    <td class="p-4 text-text-primary">科创50ETF</td>
+                                    <td class="p-4 data-cell text-text-muted text-sm">588000</td>
+                                    <td class="p-4 text-right data-cell font-semibold negative">-1.50%</td>
+                                </tr>
+                                <tr>
+                                    <td class="p-4 font-medium text-gold-400/90 align-top" rowspan="3">中小规模/成长</td>
+                                    <td class="p-4 text-text-primary">中证500ETF</td>
+                                    <td class="p-4 data-cell text-text-muted text-sm">510500</td>
+                                    <td class="p-4 text-right data-cell font-semibold negative">-2.04%</td>
+                                </tr>
+                                <tr>
+                                    <td class="p-4 text-text-primary">中证1000ETF</td>
+                                    <td class="p-4 data-cell text-text-muted text-sm">159845</td>
+                                    <td class="p-4 text-right data-cell font-semibold negative">-1.54%</td>
+                                </tr>
+                                <tr>
+                                    <td class="p-4 text-text-primary">科创100ETF</td>
+                                    <td class="p-4 data-cell text-text-muted text-sm">588190</td>
+                                    <td class="p-4 text-right data-cell font-semibold negative">-1.70%</td>
+                                </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+
+        <!-- 行业与主题板块 -->
+        <section class="mb-8 animate-in delay-4">
+            <div class="glass-card">
+                <div class="glass-card-header p-5 md:p-6">
+                    <div class="flex items-baseline gap-3">
+                        <h2 class="section-title text-xl font-bold text-text-primary">行业与主题板块</h2>
+                        <span class="text-xs text-text-muted">按涨幅排序</span>
+                    </div>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="table-modern w-full">
+                        <thead>
+                            <tr>
+                                <th class="p-4 text-left">监控ETF</th>
+                                <th class="p-4 text-right">当日涨跌</th>
+                                <th class="p-4 text-left">核心成分股/龙头</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td class="p-4 font-medium text-red-800 text-text-primary">银行ETF</td>
+                                <td class="p-4 text-right data-cell font-bold positive">+1.67%</td>
+                                <td class="p-4 text-sm">
+                                    <div class="flex flex-wrap gap-x-4 gap-y-1">
+                                        <span class="text-text-secondary">
+                                            招商银行: <span class="data-cell positive font-bold">+1.79%</span>
+                                        </span>
+                                    </div>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td class="p-4 font-medium text-red-800 text-text-primary">医药ETF</td>
+                                <td class="p-4 text-right data-cell font-bold positive">+1.05%</td>
+                                <td class="p-4 text-sm">
+                                    <div class="flex flex-wrap gap-x-4 gap-y-1">
+                                        <span class="text-text-secondary">
+                                            恒瑞医药: <span class="data-cell positive font-bold">+0.97%</span>
+                                        </span>
+                                        <span class="text-text-secondary">
+                                            药明康德: <span class="data-cell positive font-bold">+1.57%</span>
+                                        </span>
+                                    </div>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td class="p-4 font-medium text-red-800 text-text-primary">消费ETF</td>
+                                <td class="p-4 text-right data-cell font-bold positive">+1.00%</td>
+                                <td class="p-4 text-sm">
+                                    <div class="flex flex-wrap gap-x-4 gap-y-1">
+                                        <span class="text-text-secondary">
+                                            贵州茅台: <span class="data-cell positive font-bold">+1.97%</span>
+                                        </span>
+                                    </div>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td class="p-4 font-medium  text-text-primary">食品饮料ETF</td>
+                                <td class="p-4 text-right data-cell font-bold positive">+0.93%</td>
+                                <td class="p-4 text-sm">
+                                    <div class="flex flex-wrap gap-x-4 gap-y-1">
+                                        <span class="text-text-secondary">
+                                            五粮液: <span class="data-cell positive ">+0.34%</span>
+                                        </span>
+                                        <span class="text-text-secondary">
+                                            泸州老窖: <span class="data-cell negative ">-0.67%</span>
+                                        </span>
+                                    </div>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td class="p-4 font-medium  text-text-primary">医疗ETF</td>
+                                <td class="p-4 text-right data-cell font-bold positive">+0.22%</td>
+                                <td class="p-4 text-sm">
+                                    <div class="flex flex-wrap gap-x-4 gap-y-1">
+                                        <span class="text-text-secondary">
+                                            迈瑞医疗: <span class="data-cell negative ">-0.29%</span>
+                                        </span>
+                                        <span class="text-text-secondary">
+                                            爱尔眼科: <span class="data-cell positive ">+2.49%</span>
+                                        </span>
+                                    </div>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td class="p-4 font-medium  text-text-primary">券商ETF</td>
+                                <td class="p-4 text-right data-cell font-bold positive">+0.18%</td>
+                                <td class="p-4 text-sm">
+                                    <div class="flex flex-wrap gap-x-4 gap-y-1">
+                                        <span class="text-text-secondary">
+                                            中信证券: <span class="data-cell negative ">-0.32%</span>
+                                        </span>
+                                        <span class="text-text-secondary">
+                                            东方财富: <span class="data-cell positive ">+0.17%</span>
+                                        </span>
+                                    </div>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td class="p-4 font-medium  text-text-primary">保险主题ETF</td>
+                                <td class="p-4 text-right data-cell font-bold positive">+0.00%</td>
+                                <td class="p-4 text-sm">
+                                    <div class="flex flex-wrap gap-x-4 gap-y-1">
+                                        <span class="text-text-secondary">
+                                            中国平安: <span class="data-cell negative ">-0.07%</span>
+                                        </span>
+                                    </div>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td class="p-4 font-medium  text-text-primary">人工智能AI ETF</td>
+                                <td class="p-4 text-right data-cell font-bold negative">-1.06%</td>
+                                <td class="p-4 text-sm">
+                                    <div class="flex flex-wrap gap-x-4 gap-y-1">
+                                        <span class="text-text-secondary">
+                                            科大讯飞: <span class="data-cell negative ">-2.07%</span>
+                                        </span>
+                                        <span class="text-text-secondary">
+                                            浪潮信息: <span class="data-cell negative ">-0.38%</span>
+                                        </span>
+                                    </div>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td class="p-4 font-medium  text-text-primary">芯片ETF</td>
+                                <td class="p-4 text-right data-cell font-bold negative">-1.19%</td>
+                                <td class="p-4 text-sm">
+                                    <div class="flex flex-wrap gap-x-4 gap-y-1">
+                                        <span class="text-text-secondary">
+                                            中芯国际: <span class="data-cell negative ">-2.65%</span>
+                                        </span>
+                                        <span class="text-text-secondary">
+                                            北方华创: <span class="data-cell negative ">-0.10%</span>
+                                        </span>
+                                    </div>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td class="p-4 font-medium  text-text-primary">软件ETF</td>
+                                <td class="p-4 text-right data-cell font-bold negative">-1.41%</td>
+                                <td class="p-4 text-sm">
+                                    <div class="flex flex-wrap gap-x-4 gap-y-1">
+                                        <span class="text-text-secondary">
+                                            金山办公: <span class="data-cell negative ">-1.50%</span>
+                                        </span>
+                                    </div>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td class="p-4 font-medium text-green-800 text-text-primary">新能源车ETF</td>
+                                <td class="p-4 text-right data-cell font-bold negative">-2.35%</td>
+                                <td class="p-4 text-sm">
+                                    <div class="flex flex-wrap gap-x-4 gap-y-1">
+                                        <span class="text-text-secondary">
+                                            宁德时代: <span class="data-cell negative ">-0.57%</span>
+                                        </span>
+                                        <span class="text-text-secondary">
+                                            比亚迪: <span class="data-cell positive ">+1.09%</span>
+                                        </span>
+                                    </div>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td class="p-4 font-medium text-green-800 text-text-primary">煤炭ETF</td>
+                                <td class="p-4 text-right data-cell font-bold negative">-2.83%</td>
+                                <td class="p-4 text-sm">
+                                    <div class="flex flex-wrap gap-x-4 gap-y-1">
+                                        <span class="text-text-secondary">
+                                            中国神华: <span class="data-cell negative ">-1.32%</span>
+                                        </span>
+                                    </div>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td class="p-4 font-medium text-green-800 text-text-primary">有色金属ETF</td>
+                                <td class="p-4 text-right data-cell font-bold negative">-4.84%</td>
+                                <td class="p-4 text-sm">
+                                    <div class="flex flex-wrap gap-x-4 gap-y-1">
+                                        <span class="text-text-secondary">
+                                            紫金矿业: <span class="data-cell negative ">-4.37%</span>
+                                        </span>
+                                    </div>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+
+        <!-- 风险偏好指标 -->
+        <section class="mb-8">
+            <div class="glass-card">
+                <div class="glass-card-header p-5 md:p-6">
+                    <h2 class="section-title text-xl font-bold text-text-primary">风险偏好指标</h2>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="table-modern w-full">
+                        <thead>
+                            <tr>
+                                <th class="p-4 text-left">类别</th>
+                                <th class="p-4 text-left">监控对象</th>
+                                <th class="p-4 text-right">当前价格</th>
+                                <th class="p-4 text-right">当日涨跌</th>
+                                <th class="p-4 text-left">市场解读</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td class="p-4 text-text-muted text-sm">国内避险</td>
+                                <td class="p-4 font-medium text-text-primary">黄金ETF</td>
+                                <td class="p-4 text-right data-cell text-text-secondary">10.52</td>
+                                <td class="p-4 text-right data-cell font-semibold negative">-3.17%</td>
+                                <td class="p-4 text-sm text-text-muted max-w-xs">市场风险偏好</td>
+                            </tr>
+                            <tr>
+                                <td class="p-4 text-text-muted text-sm">国内安全</td>
+                                <td class="p-4 font-medium text-text-primary">30年国债ETF</td>
+                                <td class="p-4 text-right data-cell text-text-secondary">115.23</td>
+                                <td class="p-4 text-right data-cell font-semibold positive">+0.39%</td>
+                                <td class="p-4 text-sm text-text-muted max-w-xs">资金流向风险资产</td>
+                            </tr>
+                            <tr>
+                                <td class="p-4 text-text-muted text-sm">全球避险</td>
+                                <td class="p-4 font-medium text-text-primary">COMEX黄金</td>
+                                <td class="p-4 text-right data-cell text-text-secondary">4,938.20</td>
+                                <td class="p-4 text-right data-cell font-semibold positive">+0.36%</td>
+                                <td class="p-4 text-sm text-text-muted max-w-xs">避险情绪</td>
+                            </tr>
+                            <tr>
+                                <td class="p-4 text-text-muted text-sm">全球风险锚</td>
+                                <td class="p-4 font-medium text-text-primary">10年期美债收益率</td>
+                                <td class="p-4 text-right data-cell text-text-secondary">4.28</td>
+                                <td class="p-4 text-right data-cell font-semibold positive">↑ 0.02%</td>
+                                <td class="p-4 text-sm text-text-muted max-w-xs">对高估值成长股构成潜在压力</td>
+                            </tr>
+                            <tr>
+                                <td class="p-4 text-text-muted text-sm">做多A股</td>
+                                <td class="p-4 font-medium text-text-primary">YINN富时3倍做多中国</td>
+                                <td class="p-4 text-right data-cell text-text-secondary">41.51</td>
+                                <td class="p-4 text-right data-cell font-semibold negative">-3.47%</td>
+                                <td class="p-4 text-sm text-text-muted max-w-xs">外资看多看空</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+
+        <!-- 全球环境与关联市场 -->
+        <section class="mb-10">
+            <div class="glass-card">
+                <div class="glass-card-header p-5 md:p-6">
+                    <h2 class="section-title text-xl font-bold text-text-primary pulse-dot">全球环境与关联市场</h2>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="table-modern w-full">
+                        <thead>
+                            <tr>
+                                <th class="p-4 text-left">市场</th>
+                                <th class="p-4 text-left">指标</th>
+                                <th class="p-4 text-right">当前价格</th>
+                                <th class="p-4 text-right">涨跌幅</th>
+                                <th class="p-4 text-left">影响解读</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                                <tr>
+                                    <td class="p-4 align-top" rowspan="2">
+                                        <div class="flex items-center gap-2">
+                                            <span class="badge-market badge-hk text-white">HK</span>
+                                            <span class="font-medium text-text-primary">香港</span>
+                                        </div>
+                                    </td>
+                                    <td class="p-4 text-text-secondary">恒生指数</td>
+                                    <td class="p-4 text-right data-cell text-text-secondary">26,774.63</td>
+                                    <td class="p-4 text-right data-cell font-semibold negative">-0.27%</td>
+                                    <td class="p-4 text-sm text-text-muted max-w-xs"></td>
+                                </tr>
+                                <tr>
+                                    <td class="p-4 text-text-secondary">恒生科技指数</td>
+                                    <td class="p-4 text-right data-cell text-text-secondary">5,372.64</td>
+                                    <td class="p-4 text-right data-cell font-semibold positive">+0.00%</td>
+                                    <td class="p-4 text-sm text-text-muted max-w-xs">与A股科技板块形成共振</td>
+                                </tr>
+                                <tr>
+                                    <td class="p-4 align-top" rowspan="4">
+                                        <div class="flex items-center gap-2">
+                                            <span class="badge-market badge-us text-white">US</span>
+                                            <span class="font-medium text-text-primary">美股</span>
+                                        </div>
+                                    </td>
+                                    <td class="p-4 text-text-secondary">标普500</td>
+                                    <td class="p-4 text-right data-cell text-text-secondary">6,882.72</td>
+                                    <td class="p-4 text-right data-cell font-semibold positive">+0.00%</td>
+                                    <td class="p-4 text-sm text-text-muted max-w-xs">全球风险偏好向好</td>
+                                </tr>
+                                <tr>
+                                    <td class="p-4 text-text-secondary">纳斯达克100</td>
+                                    <td class="p-4 text-right data-cell text-text-secondary">24,891.24</td>
+                                    <td class="p-4 text-right data-cell font-semibold positive">+0.00%</td>
+                                    <td class="p-4 text-sm text-text-muted max-w-xs">利好A股科技股开盘</td>
+                                </tr>
+                                <tr>
+                                    <td class="p-4 text-text-secondary">英伟达(NVDA)</td>
+                                    <td class="p-4 text-right data-cell text-text-secondary">174.19</td>
+                                    <td class="p-4 text-right data-cell font-semibold positive">+0.00%</td>
+                                    <td class="p-4 text-sm text-text-muted max-w-xs">AI与半导体情绪高涨</td>
+                                </tr>
+                                <tr>
+                                    <td class="p-4 text-text-secondary">金龙中国指数</td>
+                                    <td class="p-4 text-right data-cell text-text-secondary">28.58</td>
+                                    <td class="p-4 text-right data-cell font-semibold positive">+0.00%</td>
+                                    <td class="p-4 text-sm text-text-muted max-w-xs">提振中概股相关板块情绪</td>
+                                </tr>
+                                <tr>
+                                    <td class="p-4 align-top" rowspan="1">
+                                        <div class="flex items-center gap-2">
+                                            <span class="badge-market badge-fx text-white">FX</span>
+                                            <span class="font-medium text-text-primary">汇率</span>
+                                        </div>
+                                    </td>
+                                    <td class="p-4 text-text-secondary">美元/离岸CNH</td>
+                                    <td class="p-4 text-right data-cell text-text-secondary">6.94</td>
+                                    <td class="p-4 text-right data-cell font-semibold positive">+0.00%</td>
+                                    <td class="p-4 text-sm text-text-muted max-w-xs">人民币升值，利好外资流入</td>
+                                </tr>
+                                <tr>
+                                    <td class="p-4 align-top" rowspan="2">
+                                        <div class="flex items-center gap-2">
+                                            <span class="badge-market badge-crypto text-white">₿</span>
+                                            <span class="font-medium text-text-primary">加密货币</span>
+                                        </div>
+                                    </td>
+                                    <td class="p-4 text-text-secondary">比特币(BTC)</td>
+                                    <td class="p-4 text-right data-cell text-text-secondary">70,996.75</td>
+                                    <td class="p-4 text-right data-cell font-semibold negative">-2.77%</td>
+                                    <td class="p-4 text-sm text-text-muted max-w-xs">全球投机情绪回暖</td>
+                                </tr>
+                                <tr>
+                                    <td class="p-4 text-text-secondary">以太坊(ETH)</td>
+                                    <td class="p-4 text-right data-cell text-text-secondary">2,099.43</td>
+                                    <td class="p-4 text-right data-cell font-semibold negative">-2.06%</td>
+                                    <td class="p-4 text-sm text-text-muted max-w-xs">高风险偏好资产表现强势</td>
+                                </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+
+        <!-- 页脚 -->
+        <footer class="text-center py-10">
+            <div class="divider-ornate mb-6">
+                <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+                    <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/>
+                </svg>
+            </div>
+            <p class="text-text-secondary text-sm mb-2">淮舟金融科技 · 智能金融数据分析平台</p>
+            <p class="text-text-muted text-xs">&copy; 2026 Huaizhou FinTech. All rights reserved.</p>
+        </footer>
+    </div>
+</body>
+</html>

@@ -11,12 +11,14 @@ NC='\033[0m' # No Color
 
 # 设置变量
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+PROJECT_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
 TASK_NAME_1="com.gupiao.autoprocess.1430"
 TASK_NAME_2="com.gupiao.autoprocess.1510"
 LOCAL_TIME_1="14:30:00"
 LOCAL_TIME_2="15:10:00"
 RUN_ALL_SCRIPT="${SCRIPT_DIR}/run_all_tasks.sh"
-LOG_FILE="${SCRIPT_DIR}/auto_run.log"
+LOG_FILE="${PROJECT_ROOT}/logs/auto_run.log"
+VENV_DIR="${PROJECT_ROOT}/venv"
 
 # LaunchAgents 目录
 LAUNCH_AGENTS_DIR="${HOME}/Library/LaunchAgents"
@@ -47,10 +49,9 @@ if [ ! -f "$RUN_ALL_SCRIPT" ]; then
 fi
 
 # 检查虚拟环境
-VENV_DIR="${SCRIPT_DIR}/venv"
 if [ ! -d "$VENV_DIR" ]; then
     echo -e "${YELLOW}警告: 未找到虚拟环境: $VENV_DIR${NC}"
-    echo -e "${YELLOW}请先运行: python3 -m venv venv${NC}"
+    echo -e "${YELLOW}请先运行: cd ${PROJECT_ROOT} && python3 -m venv venv${NC}"
     echo -e "${YELLOW}然后安装依赖: source venv/bin/activate && pip install -r webhtml/requirements.txt${NC}"
     read -p "是否继续? (y/n): " -n 1 -r
     echo
@@ -92,11 +93,11 @@ create_plist() {
         <integer>${minute}</integer>
     </dict>
     <key>StandardOutPath</key>
-    <string>${SCRIPT_DIR}/${task_name}.log</string>
+    <string>${PROJECT_ROOT}/logs/${task_name}.log</string>
     <key>StandardErrorPath</key>
-    <string>${SCRIPT_DIR}/${task_name}.error.log</string>
+    <string>${PROJECT_ROOT}/logs/${task_name}.error.log</string>
     <key>WorkingDirectory</key>
-    <string>${SCRIPT_DIR}</string>
+    <string>${PROJECT_ROOT}</string>
     <key>EnvironmentVariables</key>
     <dict>
         <key>PATH</key>
@@ -175,10 +176,10 @@ echo "  时间: 每天 ${LOCAL_TIME_2}"
 echo "  配置: ${PLIST_2}"
 echo ""
 echo "日志将保存到:"
-echo "  - ${SCRIPT_DIR}/${TASK_NAME_1}.log"
-echo "  - ${SCRIPT_DIR}/${TASK_NAME_2}.log"
-echo "  - ${SCRIPT_DIR}/${TASK_NAME_1}.error.log"
-echo "  - ${SCRIPT_DIR}/${TASK_NAME_2}.error.log"
+echo "  - ${PROJECT_ROOT}/logs/${TASK_NAME_1}.log"
+echo "  - ${PROJECT_ROOT}/logs/${TASK_NAME_2}.log"
+echo "  - ${PROJECT_ROOT}/logs/${TASK_NAME_1}.error.log"
+echo "  - ${PROJECT_ROOT}/logs/${TASK_NAME_2}.error.log"
 echo "  - ${LOG_FILE}"
 echo ""
 echo "提示: 你可以通过以下命令查看任务状态:"

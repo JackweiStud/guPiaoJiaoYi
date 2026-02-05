@@ -2,17 +2,18 @@
 # run_webhtml.sh - MacOS版本
 # 运行 webhtml/main.py
 
-# 设置脚本目录
+# 设置项目根目录（脚本的上两级目录）
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-PYTHON_SCRIPT="${SCRIPT_DIR}/webhtml/main.py"
-LOG_FILE="${SCRIPT_DIR}/webhtml_run.log"
-VENV_DIR="${SCRIPT_DIR}/venv"
+PROJECT_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
+PYTHON_SCRIPT="${PROJECT_ROOT}/webhtml/main.py"
+LOG_FILE="${PROJECT_ROOT}/logs/webhtml_run.log"
+VENV_DIR="${PROJECT_ROOT}/venv"
 
 # 记录开始时间
 echo "[$(date '+%Y-%m-%d %H:%M:%S')] 开始执行 webhtml/main.py" > "$LOG_FILE"
 
 # 切换到项目根目录
-cd "$SCRIPT_DIR" || exit 1
+cd "$PROJECT_ROOT" || exit 1
 
 # 检查虚拟环境
 if [ ! -d "$VENV_DIR" ]; then

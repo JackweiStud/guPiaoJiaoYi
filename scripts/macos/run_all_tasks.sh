@@ -2,11 +2,12 @@
 # run_all_tasks.sh - MacOS版本
 # 汇总运行所有任务
 
-# 设置脚本目录
+# 设置项目根目录（脚本的上两级目录）
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-LOG_FILE="${SCRIPT_DIR}/auto_run.log"
+PROJECT_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
+LOG_FILE="${PROJECT_ROOT}/logs/auto_run.log"
 
-cd "$SCRIPT_DIR" || exit 1
+cd "$PROJECT_ROOT" || exit 1
 
 echo "[$(date '+%Y-%m-%d %H:%M:%S')] 开始执行汇总任务" >> "$LOG_FILE"
 

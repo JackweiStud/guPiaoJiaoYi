@@ -1,0 +1,374 @@
+{
+  "date": "2026-02-04",
+  "indexes": [
+    {
+      "name": "上证指数",
+      "code": "sh000001",
+      "close": 4066.9392,
+      "change_pct": -0.86,
+      "turnover_billion": 6107,
+      "volume": 384622892.0,
+      "amplitude": 0.0,
+      "volume_ratio": 0.0
+    },
+    {
+      "name": "创业板指",
+      "code": "sz399006",
+      "close": 3256.447,
+      "change_pct": -1.66,
+      "turnover_billion": 3680,
+      "volume": 13574568167.0,
+      "amplitude": 0.0,
+      "volume_ratio": 0.0
+    },
+    {
+      "name": "科创50指",
+      "code": "sh000688",
+      "close": 1430.6464,
+      "change_pct": -1.57,
+      "turnover_billion": 450,
+      "volume": 10907411.0,
+      "amplitude": 0.0,
+      "volume_ratio": 0.0
+    }
+  ],
+  "up_down": {
+    "up": 1518,
+    "down": 3539,
+    "activityPct": "29.3%"
+  },
+  "styles": [
+    {
+      "category": "大规模/价值",
+      "name": "上证50ETF",
+      "code": "510050",
+      "change_pct": -0.79
+    },
+    {
+      "category": "大规模/价值",
+      "name": "沪深300ETF",
+      "code": "510300",
+      "change_pct": -0.87
+    },
+    {
+      "category": "大规模/价值",
+      "name": "红利ETF",
+      "code": "510880",
+      "change_pct": -0.83
+    },
+    {
+      "category": "大规模/价值",
+      "name": "科创50ETF",
+      "code": "588000",
+      "change_pct": -1.76
+    },
+    {
+      "category": "中小规模/成长",
+      "name": "中证500ETF",
+      "code": "510500",
+      "change_pct": -2.27
+    },
+    {
+      "category": "中小规模/成长",
+      "name": "中证1000ETF",
+      "code": "159845",
+      "change_pct": -1.74
+    },
+    {
+      "category": "中小规模/成长",
+      "name": "科创100ETF",
+      "code": "588190",
+      "change_pct": -2.03
+    }
+  ],
+  "sectors": [
+    {
+      "etf_name": "券商ETF",
+      "code": "512000",
+      "change_pct": -0.35,
+      "leaders": [
+        {
+          "name": "中信证券",
+          "change_pct": -0.49
+        },
+        {
+          "name": "东方财富",
+          "change_pct": -0.39
+        }
+      ]
+    },
+    {
+      "etf_name": "芯片ETF",
+      "code": "512760",
+      "change_pct": -1.98,
+      "leaders": [
+        {
+          "name": "中芯国际",
+          "change_pct": -2.93
+        },
+        {
+          "name": "北方华创",
+          "change_pct": -1.74
+        }
+      ]
+    },
+    {
+      "etf_name": "人工智能AI ETF",
+      "code": "560800",
+      "change_pct": -1.44,
+      "leaders": [
+        {
+          "name": "科大讯飞",
+          "change_pct": -1.41
+        },
+        {
+          "name": "浪潮信息",
+          "change_pct": -0.73
+        }
+      ]
+    },
+    {
+      "etf_name": "软件ETF",
+      "code": "159852",
+      "change_pct": -1.41,
+      "leaders": [
+        {
+          "name": "金山办公",
+          "change_pct": -1.22
+        }
+      ]
+    },
+    {
+      "etf_name": "新能源车ETF",
+      "code": "159806",
+      "change_pct": -2.48,
+      "leaders": [
+        {
+          "name": "宁德时代",
+          "change_pct": -1.78
+        },
+        {
+          "name": "比亚迪",
+          "change_pct": 1.09
+        }
+      ]
+    },
+    {
+      "etf_name": "保险主题ETF",
+      "code": "512070",
+      "change_pct": -0.87,
+      "leaders": [
+        {
+          "name": "中国平安",
+          "change_pct": -0.93
+        }
+      ]
+    },
+    {
+      "etf_name": "银行ETF",
+      "code": "512800",
+      "change_pct": 1.28,
+      "leaders": [
+        {
+          "name": "招商银行",
+          "change_pct": 0.95
+        }
+      ]
+    },
+    {
+      "etf_name": "有色金属ETF",
+      "code": "512400",
+      "change_pct": -5.1,
+      "leaders": [
+        {
+          "name": "紫金矿业",
+          "change_pct": -4.88
+        }
+      ]
+    },
+    {
+      "etf_name": "煤炭ETF",
+      "code": "515220",
+      "change_pct": -3.43,
+      "leaders": [
+        {
+          "name": "中国神华",
+          "change_pct": -2.43
+        }
+      ]
+    },
+    {
+      "etf_name": "消费ETF",
+      "code": "159928",
+      "change_pct": 0.63,
+      "leaders": [
+        {
+          "name": "贵州茅台",
+          "change_pct": 1.55
+        }
+      ]
+    },
+    {
+      "etf_name": "食品饮料ETF",
+      "code": "159843",
+      "change_pct": 0.78,
+      "leaders": [
+        {
+          "name": "五粮液",
+          "change_pct": 0.38
+        },
+        {
+          "name": "泸州老窖",
+          "change_pct": -0.5
+        }
+      ]
+    },
+    {
+      "etf_name": "医药ETF",
+      "code": "512010",
+      "change_pct": 1.05,
+      "leaders": [
+        {
+          "name": "恒瑞医药",
+          "change_pct": 0.78
+        },
+        {
+          "name": "药明康德",
+          "change_pct": 1.53
+        }
+      ]
+    },
+    {
+      "etf_name": "医疗ETF",
+      "code": "159828",
+      "change_pct": 0.0,
+      "leaders": [
+        {
+          "name": "迈瑞医疗",
+          "change_pct": -0.28
+        },
+        {
+          "name": "爱尔眼科",
+          "change_pct": 2.85
+        }
+      ]
+    }
+  ],
+  "risks": [
+    {
+      "category": "国内避险",
+      "name": "黄金ETF",
+      "code": "518880",
+      "price": 10.46,
+      "value_or_change": -3.75,
+      "interpretation": "市场风险偏好"
+    },
+    {
+      "category": "国内安全",
+      "name": "30年国债ETF",
+      "code": "511090",
+      "price": 114.895,
+      "value_or_change": 0.1,
+      "interpretation": "资金流向风险资产"
+    },
+    {
+      "category": "全球避险",
+      "name": "COMEX黄金",
+      "code": "GLOBAL_COMEX_GOLD",
+      "price": 4862.89990234375,
+      "value_or_change": -0.8320307389051117,
+      "interpretation": "避险情绪"
+    },
+    {
+      "category": "全球风险锚",
+      "name": "10年期美债收益率",
+      "code": "US10Y",
+      "price": 4.275000095367432,
+      "value_or_change": 0.023395589178362975,
+      "interpretation": "对高估值成长股构成潜在压力"
+    },
+    {
+      "category": "做多A股",
+      "name": "YINN富时3倍做多中国",
+      "code": "YINN",
+      "price": 41.5099983215332,
+      "value_or_change": -3.4651201824809226,
+      "interpretation": "外资看多看空"
+    }
+  ],
+  "globals": [
+    {
+      "category": "香港",
+      "indicator": "恒生指数",
+      "code": "^HSI",
+      "price": 26499.740234375,
+      "value_or_change": -1.2946546399387509,
+      "interpretation": ""
+    },
+    {
+      "category": "香港",
+      "indicator": "恒生科技指数",
+      "code": "HSTECH.HK",
+      "price": 5308.31982421875,
+      "value_or_change": 0.0,
+      "interpretation": "与A股科技板块形成共振"
+    },
+    {
+      "category": "美股",
+      "indicator": "标普500",
+      "code": "^GSPC",
+      "price": 6882.72021484375,
+      "value_or_change": 0.0,
+      "interpretation": "全球风险偏好向好"
+    },
+    {
+      "category": "美股",
+      "indicator": "纳斯达克100",
+      "code": "^NDX",
+      "price": 24891.240234375,
+      "value_or_change": 0.0,
+      "interpretation": "利好A股科技股开盘"
+    },
+    {
+      "category": "美股",
+      "indicator": "英伟达(NVDA)",
+      "code": "NVDA",
+      "price": 174.19000244140625,
+      "value_or_change": 0.0,
+      "interpretation": "AI与半导体情绪高涨"
+    },
+    {
+      "category": "美股",
+      "indicator": "金龙中国指数",
+      "code": "PGJ",
+      "price": 28.579999923706055,
+      "value_or_change": 0.0,
+      "interpretation": "提振中概股相关板块情绪"
+    },
+    {
+      "category": "汇率",
+      "indicator": "美元/离岸CNH",
+      "code": "CNH=X",
+      "price": 6.944109916687012,
+      "value_or_change": 0.0,
+      "interpretation": "人民币升值，利好外资流入"
+    },
+    {
+      "category": "加密货币",
+      "indicator": "比特币(BTC)",
+      "code": "BTC-USD",
+      "price": 71492.09375,
+      "value_or_change": 0.0,
+      "interpretation": "全球投机情绪回暖"
+    },
+    {
+      "category": "加密货币",
+      "indicator": "以太坊(ETH)",
+      "code": "ETH-USD",
+      "price": 2118.832763671875,
+      "value_or_change": 0.0,
+      "interpretation": "高风险偏好资产表现强势"
+    }
+  ],
+  "_source": "akshare"
+}
