@@ -60,11 +60,14 @@ def load_etf_data(filepath):
     df = pd.read_csv(filepath, sep=',') # 或者 pd.read_excel(filepath)
     df['DateTime'] = pd.to_datetime(df['DateTime'])
     df.set_index('DateTime', inplace=True)
-    # 确保数值列是float类型
-    cols_to_numeric = ['OpenValue', 'CloseValue', 'HighValue', 'LowValue', 'Volume', 'ChangeRate', '成交额', '振幅', '涨跌幅', '涨跌额']
+    # 确保数值列是float类型（只处理实际存在的列）
+    cols_to_numeric = ['OpenValue', 'CloseValue', 'HighValue', 'LowValue', 'Volume', 'ChangeRate']
     for col in cols_to_numeric:
-        df[col] = pd.to_numeric(df[col], errors='coerce') # errors='coerce' 会将无法转换的设为NaN
-    df.dropna(inplace=True) # 处理可能的NaN值
+        if col in df.columns:
+            df[col] = pd.to_numeric(df[col], errors='coerce') # errors='coerce' 会将无法转换的设为NaN
+    # 只删除关键列（价格数据）为NaN的行，ChangeRate可以为空
+    essential_cols = ['OpenValue', 'CloseValue', 'HighValue', 'LowValue']
+    df.dropna(subset=essential_cols, inplace=True)
     return df
 
 # 使用示例:
