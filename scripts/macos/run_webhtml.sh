@@ -5,7 +5,7 @@
 # 设置项目根目录（脚本的上两级目录）
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PROJECT_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
-PYTHON_SCRIPT="${PROJECT_ROOT}/webhtml/main.py"
+PYTHON_SCRIPT="${PROJECT_ROOT}/run.py"
 LOG_FILE="${PROJECT_ROOT}/logs/webhtml_run.log"
 VENV_DIR="${PROJECT_ROOT}/venv"
 
@@ -37,8 +37,8 @@ fi
 echo "[$(date '+%Y-%m-%d %H:%M:%S')] 使用虚拟环境Python: $(which python3)" >> "$LOG_FILE"
 
 # 执行脚本
-echo "正在执行 $PYTHON_SCRIPT ..."
-if python3 "$PYTHON_SCRIPT" >> "$LOG_FILE" 2>&1; then
+echo "正在执行 $PYTHON_SCRIPT report ..."
+if python3 "$PYTHON_SCRIPT" report >> "$LOG_FILE" 2>&1; then
     echo "[$(date '+%Y-%m-%d %H:%M:%S')] 执行成功" >> "$LOG_FILE"
     echo "执行成功！详情请查看 $LOG_FILE"
 else

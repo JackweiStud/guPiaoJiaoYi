@@ -5,7 +5,7 @@
 # 设置项目根目录（脚本的上两级目录）
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PROJECT_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
-PYTHON_SCRIPT="${PROJECT_ROOT}/autoProcess.py"
+PYTHON_SCRIPT="${PROJECT_ROOT}/run.py"
 LOG_FILE="${PROJECT_ROOT}/logs/auto_run.log"
 VENV_DIR="${PROJECT_ROOT}/venv"
 
@@ -43,11 +43,11 @@ fi
 
 # 记录开始执行Python脚本
 echo "[$(date '+%Y-%m-%d %H:%M:%S')] 开始执行Python脚本: $PYTHON_SCRIPT" >> "$LOG_FILE"
-echo "[$(date '+%Y-%m-%d %H:%M:%S')] 执行命令: python3 $PYTHON_SCRIPT" >> "$LOG_FILE"
+echo "[$(date '+%Y-%m-%d %H:%M:%S')] 执行命令: python3 $PYTHON_SCRIPT auto" >> "$LOG_FILE"
 echo "[$(date '+%Y-%m-%d %H:%M:%S')] Python脚本输出开始 ==========================================" >> "$LOG_FILE"
 
 # 执行Python脚本
-if python3 "$PYTHON_SCRIPT" >> "$LOG_FILE" 2>&1; then
+if python3 "$PYTHON_SCRIPT" auto >> "$LOG_FILE" 2>&1; then
     EXIT_CODE=0
     echo "[$(date '+%Y-%m-%d %H:%M:%S')] Python脚本执行成功" >> "$LOG_FILE"
     echo "[$(date '+%Y-%m-%d %H:%M:%S')] 任务完成" >> "$LOG_FILE"

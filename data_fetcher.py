@@ -151,15 +151,15 @@ class ETFFetcher:
 
     def get_etf_dailyNew(self):
         """获取ETF日线数据
-        优先使用东方财富接口（重试2次），失败后使用新浪接口备用
+        优先使用东方财富接口（重试1次），失败后使用新浪接口备用
         """
         import time
         
         start_date = f"{self.config.start_date.split()[0].replace('-', '')}"
         end_date = f"{self.config.end_time.split()[0].replace('-', '')}"
         
-        # ===== 方案1: 优先使用东方财富接口（重试2次） =====
-        max_retries = 3
+        # ===== 方案1: 优先使用东方财富接口（重试1次） =====
+        max_retries = 2
         for attempt in range(max_retries):
             try:
                 if attempt == 0:
