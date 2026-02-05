@@ -13,7 +13,7 @@ sys.path.append(project_root)
 print('code path is ',project_root)
 
 from main import ETFTest
-from sdd import strategyFunc
+from sdd import strategyFunc, load_etf_data
 from mailFun import EmailSender
 from mailFun import config as email_config
 from deepSeekAi import aiDeepSeekAnly, extract_position_strategy
@@ -21,6 +21,101 @@ from deepSeekAi import aiDeepSeekAnly, extract_position_strategy
 def get_beijing_time():
     """返回当前的北京时间 (UTC+8)"""
     return datetime.now(timezone(timedelta(hours=8)))
+
+
+def _format_float(value, precision=2):
+    try:
+        if value is None or (isinstance(value, float) and np.isnan(value)):
+            return "NA"
+        return f"{float(value):.{precision}f}"
+    except Exception:
+        return "NA"
+
+
+def build_signal_reason(etf_data, params):
+    """
+    生成信号来源说明（基于均线、RSI、成交量与乖离率）。
+    """
+    if etf_data is None or etf_data.empty:
+        return "信号来源说明：数据为空"
+
+    short_window = params['short_window']
+    long_window = params['long_window']
+    volume_mavg_Value = params['volume_mavg_Value']
+    MaRateUp = params['MaRateUp']
+    VolumeSellRate = params['VolumeSellRate']
+    rsi_period = params['rsi_period']
+    rsiValueThd = params['rsiValueThd']
+    rsiRateUp = params['rsiRateUp']
+    divergence_threshold = params['divergence_threshold']
+
+    close = etf_data['CloseValue']
+    volume = etf_data['Volume']
+
+    short_mavg = close.rolling(window=short_window, min_periods=1).mean()
+    long_mavg = close.rolling(window=long_window, min_periods=1).mean()
+    volume_mavg = volume.rolling(window=volume_mavg_Value, min_periods=1).mean()
+
+    ma_state = (short_mavg >= long_mavg).astype(float)
+    ma_state_diff = ma_state.diff()
+
+    delta = close.diff()
+    gain = delta.clip(lower=0)
+    loss = -delta.clip(upper=0)
+    avg_gain = gain.ewm(com=rsi_period - 1, min_periods=rsi_period).mean()
+    avg_loss = loss.ewm(com=rsi_period - 1, min_periods=rsi_period).mean()
+    rs = avg_gain / avg_loss
+    rsi = 100 - (100 / (1 + rs))
+
+    divergence_ratio = (long_mavg - short_mavg) / long_mavg
+
+    last_idx = etf_data.index[-1]
+    last_close = close.loc[last_idx]
+    last_volume = volume.loc[last_idx]
+    last_short = short_mavg.loc[last_idx]
+    last_long = long_mavg.loc[last_idx]
+    last_volume_mavg = volume_mavg.loc[last_idx]
+    last_rsi = rsi.loc[last_idx]
+    last_div = divergence_ratio.loc[last_idx]
+    last_ma_diff = ma_state_diff.loc[last_idx]
+    last_ma_state = ma_state.loc[last_idx]
+
+    # 触发条件（与策略保持一致）
+    ma_buy_condition = (last_ma_diff == 1) and (last_volume >= (last_volume_mavg * MaRateUp))
+    rsi_buy_condition = (last_rsi < rsiValueThd) and (last_volume > (last_volume_mavg * rsiRateUp))
+    divergence_buy_condition = (last_ma_state == 0) and (last_div > divergence_threshold)
+
+    sell_condition = (last_ma_diff == -1) or (last_close < last_long)
+    sell_condition = sell_condition and (last_close < last_short)
+    uptrend_volume_sell = (last_ma_state == 1) and (last_volume > (last_volume_mavg * VolumeSellRate))
+    sell_condition = sell_condition or uptrend_volume_sell
+
+    parts = [
+        f"RSI={_format_float(last_rsi)}",
+        f"短期均线={_format_float(last_short)}",
+        f"长期均线={_format_float(last_long)}",
+        f"量比={_format_float(last_volume / last_volume_mavg if last_volume_mavg else None)}"
+    ]
+
+    triggers = []
+    if ma_buy_condition:
+        triggers.append("均线短期上穿且放量确认")
+    if rsi_buy_condition:
+        triggers.append("RSI低于阈值且放量")
+    if divergence_buy_condition:
+        triggers.append(f"乖离率={_format_float(last_div * 100, 2)}% 超过阈值")
+    if sell_condition:
+        if last_ma_diff == -1:
+            triggers.append("均线死叉")
+        if (last_close < last_long) and (last_close < last_short):
+            triggers.append("收盘价跌破均线")
+        if uptrend_volume_sell:
+            triggers.append("上升趋势放量")
+
+    if not triggers:
+        triggers.append("暂无触发条件")
+
+    return f"信号来源说明：{', '.join(parts + triggers)}"
 
 def run_trading_strategy(stock_code):
     """
@@ -62,7 +157,7 @@ def run_trading_strategy(stock_code):
 
     # 2. 实现类似 testOnlyNew 的功能，分析交易信号
     print("\n[步骤 2/3] 正在分析交易信号...")
-    _, signal_text = get_trading_signal(stock_code)
+    _, signal_text, signal_reason = get_trading_signal(stock_code)
     print(f"分析完成。{stock_code} 的今日信号: {signal_text}")
 
     #3 新增股票分析功能 调用 aiDeepSeekAnly("588180") 
@@ -83,7 +178,7 @@ def run_trading_strategy(stock_code):
 
     # 4. 根据交易信号发送邮件
     print("\n[步骤 3/3] 正在准备发送邮件通知...")
-    notify_by_email(stock_code, signal_text, aiDataInfo, strategyinfo)
+    notify_by_email(stock_code, signal_text, signal_reason, aiDataInfo, strategyinfo)
 
     print("\n" + "="*50)
     print("自动化流程执行完毕。")
@@ -92,14 +187,14 @@ def run_trading_strategy(stock_code):
 def get_trading_signal(stock_code):
     """
     调用策略函数，获取最新的交易信号。
-    返回信号类型和信号文本。
+    返回信号类型、信号文本、信号来源说明。
     """
     symbol = stock_code.split('.')[0]
     filepath = os.path.join(project_root, 'stock_data',  f'{symbol}', f'{symbol}_Day.csv')
 
     if not os.path.exists(filepath):
         print(f"错误：数据文件不存在 -> {filepath}")
-        return "error", "数据文件丢失"
+        return "error", "数据文件丢失", "信号来源说明：数据文件丢失"
 
     # 从JSON文件加载策略参数
     params_path = os.path.join(project_root, 'strategy_params.json')
@@ -129,12 +224,26 @@ def get_trading_signal(stock_code):
 
     except (FileNotFoundError, KeyError) as e:
         print(f"警告: 无法从 'strategy_params.json' 加载参数 (错误: {e})。将使用代码中定义的默认参数。")
+        params = {
+            'short_window': np.int64(4),
+            'long_window': np.int64(15),
+            'volume_mavg_Value': np.int64(10),
+            'MaRateUp': np.float64(1.5),
+            'VolumeSellRate': np.float64(4.0),
+            'rsi_period': np.int64(14),
+            'rsiValueThd': np.int64(30),
+            'rsiRateUp': np.float64(1.5),
+            'divergence_threshold': np.float64(0.05)
+        }
     
     # 策略执行起始时间
     statTime='2024-01-01'
     try:
+        etf_data = load_etf_data(filepath)
+
         performance_stats = strategyFunc(
             filepath=filepath,
+            data=etf_data,
             symbol=symbol,
             short_window=params['short_window'], long_window=params['long_window'],
             volume_mavg_Value=params['volume_mavg_Value'], MaRateUp=params['MaRateUp'],
@@ -158,17 +267,19 @@ def get_trading_signal(stock_code):
 
         portfolio_df = performance_stats.get('portfolio_df')
 
+        reason_text = build_signal_reason(etf_data, params)
+
         if portfolio_df is not None and not portfolio_df.empty:
             today = pd.to_datetime(get_beijing_time().date())
             # 检查回测结果中是否有今天的信号
             if today in portfolio_df.index:
                 todays_signal_val = portfolio_df.loc[today]['signal']
                 if todays_signal_val == 1:
-                    return "buy", "买入"
+                    return "buy", "买入", reason_text
                 elif todays_signal_val == -1:
-                    return "sell", "卖出"
+                    return "sell", "卖出", reason_text
                 else:
-                    return "hold", "无信号"
+                    return "hold", "无信号", reason_text
             else:
                  # 获取最后一个交易日的信号作为参考
                 last_signal_date = portfolio_df.index[-1]
@@ -177,17 +288,17 @@ def get_trading_signal(stock_code):
                 last_signal_str = signal_map.get(last_signal_val, "无信号")
                 print(f"警告：策略结果中不包含今天({today.strftime('%Y-%m-%d')})的数据。")
                 print(f"最后一个有信号的日期是 {last_signal_date.strftime('%Y-%m-%d')}，信号为: {last_signal_str}")
-                return "no_data", f"无信号 (最后一个信号: {last_signal_str})"
+                return "no_data", f"无信号 (最后一个信号: {last_signal_str})", reason_text
         else:
-            return "hold", "无信号"
+            return "hold", "无信号", reason_text
 
     except Exception as e:
         import traceback
         print(f"错误：策略回测执行失败。错误信息: {e}")
         print(traceback.format_exc())
-        return "error", "策略执行出错"
+        return "error", "策略执行出错", "信号来源说明：计算失败"
 
-def notify_by_email(stock_code, signal_text, aiDataInfo = None, strategyinfo = None):
+def notify_by_email(stock_code, signal_text, signal_reason=None, aiDataInfo = None, strategyinfo = None):
     """
     根据信号发送邮件，增加5次重试逻辑。
     """
@@ -200,6 +311,7 @@ def notify_by_email(stock_code, signal_text, aiDataInfo = None, strategyinfo = N
             标的: {stock_code}
             时间: {get_beijing_time().strftime('%Y-%m-%d %H:%M:%S')}
             交易信号: {signal_text}
+            {signal_reason or "信号来源说明：暂无"}
 
             AI趋势策略：\n
             {strategyinfo}
@@ -300,7 +412,7 @@ if __name__ == "__main__":
     #autoProcessETF("161128.SH") ##美股
     #autoProcessETF("513160.SH") ##ganggu30
     autoProcessETF("159843.SH") ##消费
-    autoProcessETF("588180.SH") #科创50
+    #autoProcessETF("588180.SH") #科创50
     #autoProcessETF("159915.SH") ##创业
     autoProcessETF("512820.SH") ##银行
     

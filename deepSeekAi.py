@@ -225,10 +225,9 @@ def extract_position_strategy(content: str) -> str:
     return content[start_pos:].strip()
 
 def aiDeepSeekAnly(code):
-   
     # 1. 配置参数
     config = DeepSeekConfig(
-        api_key="sk-rmfaxultndibttfndnfxmwryoatbjwtbzyvumrbiamjhhbns",
+        api_key=os.getenv("DEEPSEEK_API_KEY") or "",
         system_prompt="你是一位严谨的ETF量化分析师和交易员,根据用户提供的行情数据给出核心分析和2~5天的建议,默认成功率大于66%，言辞犀利，语言精简"
     )
 

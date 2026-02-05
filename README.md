@@ -1,47 +1,276 @@
-# guPiaoJiaoYi
-AI和量化投资探索
+# guPiaoJiaoYi - AI和量化投资探索
 
-说明：
-定期更新 
-pip install --upgrade akshare
-certifi：pip install --upgrade certifi
+## 🚀 快速开始
 
+### 环境要求
+- Python 3.14+
+- 推荐使用虚拟环境
 
-#sdd.py 股票 策略相关测试
+### 安装步骤
 
+1. **创建虚拟环境**
+   ```bash
+   python3 -m venv venv
+   ```
 
-#mailFun.py 邮件触发系统
+2. **激活虚拟环境**
+   ```bash
+   # MacOS/Linux
+   source venv/bin/activate
+   
+   # Windows
+   venv\Scripts\activate
+   ```
 
-#autoProcess.py 固定股票策略查询后，当前是否出现买卖信号后，触发邮件系统
-![Uploading image.png…]()
+3. **安装依赖**
+   ```bash
+   pip install -r requirements.txt
+   ```
 
+## 📁 项目结构
 
-## 本地PC若无法发生email网络诊断 
-1、VPN设置为全局网络
-2、步骤：在 Windows 防火墙中创建出站规则
-打开高级防火墙设置
-按下键盘上的 Windows 键，直接输入 "防火墙"。
-在搜索结果中，点击 "高级安全 Windows Defender 防火墙"。
-新建出站规则
-在打开的窗口左侧，点击 "出站规则"。
-在窗口的右侧，点击 "新建规则..."。
-选择规则类型
-选择 "端口"，然后点击 "下一步"。
-指定协议和端口
-选择 "TCP"。
-选择 "特定远程端口"。
-在输入框中填入：587, 465 (用逗号隔开)
-点击 "下一步"。
-选择操作
-选择 "允许连接"，然后点击 "下一步"。
-选择配置文件
-保持所有三个选项（域、专用、公用）都勾选，点击 "下一步"。
-命名规则
-给这个规则起一个你能看懂的名字，比如 Allow Gmail SMTP。
-点击 "完成"。
+```
+guPiaoJiaoYi/
+├── scripts/
+│   ├── macos/          # MacOS 脚本
+│   │   ├── run_webhtml.sh
+│   │   ├── autoPython_bat.sh
+│   │   ├── run_all_tasks.sh
+│   │   ├── schedule_task.sh
+│   │   └── remove_task.sh
+│   └── windows/         # Windows 脚本
+│       ├── run_webhtml.bat
+│       ├── autoPython_bat.bat
+│       ├── run_all_tasks.bat
+│       ├── schedule_task.bat
+│       ├── remove_task.bat
+│       └── install_dependencies.bat
+├── logs/              # 自动化运行日志
+├── webhtml/          # Web 报告系统
+├── venv/             # Python 虚拟环境
+└── README_MacOS.md   # MacOS 详细说明
+```
 
-#powershell -- 国内可以不开VPN
-Test-NetConnection -ComputerName smtp.gmail.com -Port 465
+## 🛠 核心功能模块
 
+### 1. **数据处理** (`data_fetcher.py`, `data_manager.py`)
+- 获取 ETF 日线数据（东方财富 + 新浪备用接口）
+- 支持多只股票数据获取
+- 自动数据存储和管理
 
-autoProcess.py 使用国内网络，不需要VPN ，邮箱已改为QQ，AI--deepseek 股票为国内  --全部为国内环境
+### 2. **交易策略** (`sdd.py`, `strategyFunc`)
+- **多因子量化策略**：
+  - 均线交叉（金叉死叉）
+  - RSI 超买超卖
+  - 乖离率修复（暴跌抄底）
+  - 成交量确认
+- **智能参数配置**：每个股票可独立配置策略参数
+- **完整回测系统**：包含绩效计算、图表生成
+
+### 3. **AI 分析** (`deepSeekAi.py`)
+- 集成 DeepSeek AI 模型进行趋势分析
+- 支持数据驱动的投资建议
+- 智能提取持仓策略
+
+### 4. **自动化执行** (`autoProcess.py`)
+- 定时获取最新数据
+- 策略信号分析
+- AI 趋势分析
+- 邮件自动通知
+
+### 5. **邮件通知** (`mailFun.py`)
+- 支持 QQ、Gmail、Outlook 多种邮箱
+- HTML 邮件格式
+- 图表附件发送
+
+### 6. **Web 报告** (`webhtml/`)
+- 实时行情监控报告
+- 指数、ETF、全球风险资产分析
+- AI 智能总结
+- 邮件推送
+
+## 📊 监控股票范围
+
+- **A股ETF**：消费、银行、科创50、创业板
+- **美股ETF**：标普500、纳斯达克
+- **港股**：恒生指数、港股科技30
+- **全球资产**：黄金、美债、加密货币
+
+## ⏰ 自动化运行
+
+### MacOS
+```bash
+# 手动运行
+./scripts/macos/run_all_tasks.sh
+
+# 设置定时任务（每天 14:30 和 15:10）
+./scripts/macos/schedule_task.sh
+
+# 删除定时任务
+./scripts/macos/remove_task.sh
+```
+
+### Windows
+```bash
+# 设置定时任务
+scripts\windows\schedule_task.bat
+
+# 手动运行
+scripts\windows\run_all_tasks.bat
+```
+
+## 📋 策略参数说明
+
+每个股票的参数在 `strategy_params.json` 中配置：
+
+```json
+{
+  "default": {
+    "short_window": 5,
+    "long_window": 20,
+    "volume_mavg_Value": 20,
+    "MaRateUp": 0.02,
+    "VolumeSellRate": 0.8,
+    "rsi_period": 14,
+    "rsiValueThd": 50,
+    "rsiRateUp": 0.02,
+    "divergence_threshold": 0.05
+  },
+  "159843": {
+    "short_window": 5,
+    "long_window": 20,
+    "MaRateUp": 0.03,
+    "VolumeSellRate": 1.2
+  }
+}
+```
+
+## 📧 邮件配置
+
+发件邮箱建议通过环境变量或 `.env` 配置（避免硬编码）：
+
+```bash
+# .env 或系统环境变量
+SMTP_PROVIDER=qq
+SMTP_SENDER_EMAIL=your_email@qq.com
+SMTP_SENDER_PASSWORD=your_authorization_code
+
+# 可选备用邮箱
+SMTP_PROVIDER_ALT=gmail
+SMTP_SENDER_EMAIL_ALT=your_email@gmail.com
+SMTP_SENDER_PASSWORD_ALT=your_app_password
+```
+
+收件人仍在 `config.py` 中设置：
+
+```python
+DEFAULT_RECIPIENTS = {
+    "to": ["recipient@example.com"],
+    "cc": ["cc@example.com"]
+}
+```
+
+## 🔑 API 密钥配置
+
+**重要**：为了安全性，请使用环境变量而不是硬编码 API 密钥。
+
+### 设置环境变量
+
+**MacOS/Linux:**
+```bash
+# 临时设置（当前终端会话）
+export DEEPSEEK_API_KEY="your_deepseek_api_key_here"
+
+# 永久设置（添加到 ~/.bashrc 或 ~/.zshrc）
+echo 'export DEEPSEEK_API_KEY="your_deepseek_api_key_here"' >> ~/.zshrc
+source ~/.zshrc
+```
+
+**Windows:**
+```cmd
+# 设置环境变量
+set DEEPSEEK_API_KEY=your_deepseek_api_key_here
+
+# 永久设置（系统环境变量）
+setx DEEPSEEK_API_KEY "your_deepseek_api_key_here"
+```
+
+### 验证配置
+
+```bash
+# 检查环境变量是否设置
+echo $DEEPSEEK_API_KEY
+
+# Python 中验证
+python3 -c "import os; print(os.getenv('DEEPSEEK_API_KEY'))"
+```
+
+### 涉及的 API
+
+1. **DeepSeek AI** (`deepSeekAi.py`, `webhtml/config/settings.py`)
+   - 用途：股票数据分析、投资建议
+   - 环境变量：`DEEPSEEK_API_KEY`
+
+### 获取 API 密钥
+
+1. 访问 [硅基流动](https://siliconflow.cn/)
+2. 注册/登录账户
+3. 在控制台获取 API 密钥
+4. 将密钥设置为环境变量
+
+### 安全提醒
+
+⚠️ **切勿**：
+- 在代码中硬编码 API 密钥
+- 将密钥提交到版本控制系统
+- 在日志中打印密钥
+
+✅ **应该**：
+- 使用环境变量
+- 将密钥添加到 `.env` 文件并添加到 `.gitignore`
+- 定期轮换 API 密钥
+
+## 🔧 故障排除
+
+### 网络连接问题
+- **国内环境**：使用新浪接口（已配置备用）
+- **国外环境**：可使用东方财富接口
+- **代理设置**：确保网络能访问 akshare 接口
+
+### Python 环境
+```bash
+# 检查虚拟环境
+source venv/bin/activate
+python3 -c "import akshare, pandas, matplotlib; print('OK')"
+
+# 安装缺失依赖
+pip install --upgrade akshare pandas matplotlib requests tenacity pydantic httpx jinja2
+```
+
+### 定时任务
+```bash
+# MacOS 查看任务状态
+launchctl list | grep com.gupiao
+
+# Windows 查看任务状态
+schtasks /query | findstr "AutoProcess"
+```
+
+## 📈 更新日志
+
+- **2026-02-05**: MacOS 兼容性改进，目录结构重构
+- **2026-02-04**: 修复数据加载问题，适配 MacOS 环境
+
+## ⚠️ 注意事项
+
+1. **网络环境**：国内使用无需VPN，国外可能需要代理
+2. **邮箱设置**：QQ邮箱需要授权码，非密码
+3. **数据来源**：优先使用东方财富，失败自动切换新浪
+4. **风险控制**：所有策略仅供参考，投资需谨慎
+
+## 📞 支持
+
+详细使用说明请参考：
+- `readmeMd/README_MacOS.md` - MacOS 详细设置
+- `readmeMd/README_QQ邮箱配置.md` - 邮箱配置说明
+- `readmeMd/README_自动任务设置.md` - Windows 任务设置

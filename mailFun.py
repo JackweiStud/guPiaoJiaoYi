@@ -187,8 +187,8 @@ def mailSendTest():
     print("-"*60)
 
     # 步骤 2: 检查配置是否已修改
-    if "your_email" in config.SENDER_CREDENTIALS["email"] or "your_password" in config.SENDER_CREDENTIALS["password"]:
-         print(">>> 配置错误：请先在 'config.py' 文件中填写你的邮箱信息！<<<")
+    if not config.SENDER_CREDENTIALS["email"] or not config.SENDER_CREDENTIALS["password"]:
+         print(">>> 配置错误：请先在环境变量或 .env 中填写 SMTP_SENDER_EMAIL / SMTP_SENDER_PASSWORD！<<<")
     else:
         try:
             # 步骤 3: 初始化邮件发送器

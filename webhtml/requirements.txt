@@ -1,7 +1,2 @@
-jinja2>=3.1.2
-pandas>=2.0.0
-requests>=2.31.0
-python-dateutil>=2.8.2
-akshare>=1.12.95
-yfinance>=0.2.18
-
+# Web 报告系统依赖（统一由根目录 requirements.txt 管理）
+-r ../requirements.txt

@@ -21,7 +21,7 @@ USE_DEEPSEEK = 1  # 可选AI总结，默认关闭；可复用 deepSeekAi.py
 
 # DeepSeek / 邮件配置占位（请在需要时填充或读取外部配置）
 DEEPSEEK_API_BASE = "https://api.siliconflow.cn/v1"
-DEEPSEEK_API_KEY = "sk-rmfaxultndibttfndnfxmwryoatbjwtbzyvumrbiamjhhbns"
+DEEPSEEK_API_KEY = os.getenv("DEEPSEEK_API_KEY") or ""
 
 
 def ensure_directories() -> None:

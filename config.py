@@ -5,10 +5,39 @@ from datetime import datetime
 import os
 
 
-#数据存储目录（相对于项目根目录）
+# 数据存储目录（相对于项目根目录）
 BASE_DIR = Path(__file__).resolve().parent
 DATA_DIR = BASE_DIR / "stock_data"
 START_TIME = "2021-01-01 09:30:00"
+
+# ------------------------------------------------------------------------
+# 环境变量加载（支持 .env 文件）
+# ------------------------------------------------------------------------
+def _load_env_file(env_path: Path) -> None:
+    """
+    轻量 .env 解析器：仅处理 KEY=VALUE 格式，忽略空行和注释。
+    不覆盖已有的系统环境变量。
+    """
+    if not env_path.exists():
+        return
+
+    try:
+        for line in env_path.read_text(encoding="utf-8").splitlines():
+            line = line.strip()
+            if not line or line.startswith("#"):
+                continue
+            if "=" not in line:
+                continue
+            key, value = line.split("=", 1)
+            key = key.strip()
+            value = value.strip().strip('"').strip("'")
+            os.environ.setdefault(key, value)
+    except Exception:
+        # 读取失败时不阻断启动
+        pass
+
+
+_load_env_file(BASE_DIR / ".env")
 
 class ETFConfig:
     DEFAULT_PERIODS = ['5', '15', '30', '60', '120']
@@ -63,19 +92,21 @@ SMTP_CONFIGS = {
 
 # --- 选择你要使用的发件服务商 ---
 # 从上面 SMTP_CONFIGS 中选择一个，例如 "gmail" 或 "outlook"
-ACTIVE_SMTP_PROVIDER1 = "gmail"
-ACTIVE_SMTP_PROVIDER = "qq"
+ACTIVE_SMTP_PROVIDER1 = os.getenv("SMTP_PROVIDER_ALT", "gmail")
+ACTIVE_SMTP_PROVIDER = os.getenv("SMTP_PROVIDER", "qq")
 
-# --- 填写该服务商对应的邮箱和密码/授权码 ---
+# --- 发件人账户信息（从环境变量读取） ---
+# 请在 .env 或系统环境变量中配置：
+# SMTP_SENDER_EMAIL / SMTP_SENDER_PASSWORD
+# SMTP_SENDER_EMAIL_ALT / SMTP_SENDER_PASSWORD_ALT（可选）
 SENDER_CREDENTIALS = {
-    "email": "719693856@qq.com",       # 你的发件邮箱地址
-    "password": "jdlxfymvnpojbdbh"          # 双认证后===你的邮箱密码或应用专用密码/授权码
+    "email": os.getenv("SMTP_SENDER_EMAIL", ""),
+    "password": os.getenv("SMTP_SENDER_PASSWORD", "")
 }
 
-
 SENDER_CREDENTIALS1 = {
-    "email": "jackwlianmu@gmail.com",       # 你的发件邮箱地址
-    "password": "ewduvpnmffmnkuqe"          # 双认证后===你的邮箱密码或应用专用密码/授权码
+    "email": os.getenv("SMTP_SENDER_EMAIL_ALT", ""),
+    "password": os.getenv("SMTP_SENDER_PASSWORD_ALT", "")
 }
 
 # ========================================================================
@@ -96,4 +127,3 @@ DEMO_CONTENT = {
     "body": "你好，\n\n如果你收到了这封邮件，说明代码重构成功，现在结构更清晰、更易于扩展了！",
     "image_path": "python_email_demo_image.png"
 } 
-

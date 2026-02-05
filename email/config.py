@@ -1,4 +1,27 @@
 # emailFile/config.py
+import os
+from pathlib import Path
+
+# 读取 .env（不覆盖已有环境变量）
+def _load_env_file(env_path: Path) -> None:
+    if not env_path.exists():
+        return
+    try:
+        for line in env_path.read_text(encoding="utf-8").splitlines():
+            line = line.strip()
+            if not line or line.startswith("#"):
+                continue
+            if "=" not in line:
+                continue
+            key, value = line.split("=", 1)
+            key = key.strip()
+            value = value.strip().strip('"').strip("'")
+            os.environ.setdefault(key, value)
+    except Exception:
+        pass
+
+
+_load_env_file(Path(__file__).resolve().parents[1] / ".env")
 
 # ========================================================================
 # 邮件服务商 SMTP 配置
@@ -34,12 +57,12 @@ SMTP_CONFIGS = {
 
 # --- 选择你要使用的发件服务商 ---
 # 从上面 SMTP_CONFIGS 中选择一个，例如 "gmail" 或 "outlook"
-ACTIVE_SMTP_PROVIDER = "gmail"
+ACTIVE_SMTP_PROVIDER = os.getenv("SMTP_PROVIDER", "gmail")
 
 # --- 填写该服务商对应的邮箱和密码/授权码 ---
 SENDER_CREDENTIALS = {
-    "email": "jackwlianmu@gmail.com",       # 你的发件邮箱地址
-    "password": "ewduvpnmffmnkuqe"          # 双认证后===你的邮箱密码或应用专用密码/授权码
+    "email": os.getenv("SMTP_SENDER_EMAIL", ""),
+    "password": os.getenv("SMTP_SENDER_PASSWORD", "")
 }
 
 # ========================================================================
