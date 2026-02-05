@@ -11,19 +11,14 @@
 # 4. 开启"POP3/SMTP服务"或"IMAP/SMTP服务"
 # 5. 生成授权码（注意：不是QQ密码！）
 
-# 步骤2: 修改 config.py 文件
-# 将以下配置复制到 config.py 中：
+# 步骤2: 配置环境变量（推荐）
+# 将以下内容写入项目根目录的 .env 或设置为系统环境变量：
 
-QQ_EMAIL_CONFIG = {
-    # 选择QQ邮箱作为主服务商
-    "ACTIVE_SMTP_PROVIDER": "qq",
-    
-    # 填写你的QQ邮箱信息
-    "SENDER_CREDENTIALS": {
-        "email": "你的QQ号码@qq.com",  # 例如：123456789@qq.com
-        "password": "你的授权码"       # 不是QQ密码，是生成的授权码
-    }
-}
+ENV_EXAMPLE = """
+SMTP_PROVIDER=qq
+SMTP_SENDER_EMAIL=你的QQ号码@qq.com
+SMTP_SENDER_PASSWORD=你的授权码
+"""
 
 # 步骤3: 测试配置
 # 运行以下命令测试QQ邮箱配置：

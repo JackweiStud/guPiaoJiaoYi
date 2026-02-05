@@ -8,6 +8,7 @@ __pycache__/
 # 数据目录（用户明确要求忽略）
 stock_data/
 pic/
+webhtml/output/
 
 # 日志文件
 *.log

@@ -38,18 +38,22 @@
    - 复制生成的授权码
    - 妥善保存，不要泄露给他人
 
-### 步骤2: 修改配置文件
+### 步骤2: 配置环境变量（推荐）
 
-编辑 `config.py` 文件，进行以下修改：
+将以下配置写入项目根目录的 `.env`，或设置为系统环境变量：
+
+```bash
+SMTP_PROVIDER=qq
+SMTP_SENDER_EMAIL=你的QQ号码@qq.com
+SMTP_SENDER_PASSWORD=你的授权码
+```
+
+收件人仍在 `config.py` 中设置：
 
 ```python
-# 将主服务商改为QQ邮箱
-ACTIVE_SMTP_PROVIDER = "qq"
-
-# 填写你的QQ邮箱信息
-SENDER_CREDENTIALS = {
-    "email": "你的QQ号码@qq.com",  # 例如：123456789@qq.com
-    "password": "你的授权码"       # 刚才获取的授权码，不是QQ密码
+DEFAULT_RECIPIENTS = {
+    "to": ["recipient@example.com"],
+    "cc": ["cc@example.com"]
 }
 ```
 

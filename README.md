@@ -147,19 +147,23 @@ scripts\windows\run_all_tasks.bat
 
 ## 📧 邮件配置
 
-在 `config.py` 中配置邮箱：
+发件邮箱建议通过环境变量或 `.env` 配置（避免硬编码）：
+
+```bash
+# .env 或系统环境变量
+SMTP_PROVIDER=qq
+SMTP_SENDER_EMAIL=your_email@qq.com
+SMTP_SENDER_PASSWORD=your_authorization_code
+
+# 可选备用邮箱
+SMTP_PROVIDER_ALT=gmail
+SMTP_SENDER_EMAIL_ALT=your_email@gmail.com
+SMTP_SENDER_PASSWORD_ALT=your_app_password
+```
+
+收件人仍在 `config.py` 中设置：
 
 ```python
-# 选择邮箱服务商
-ACTIVE_SMTP_PROVIDER = "qq"  # qq/gmail/outlook
-
-# 邮箱认证
-SENDER_CREDENTIALS = {
-    "email": "your_email@qq.com",
-    "password": "your_authorization_code"  # QQ邮箱用授权码
-}
-
-# 收件人
 DEFAULT_RECIPIENTS = {
     "to": ["recipient@example.com"],
     "cc": ["cc@example.com"]
