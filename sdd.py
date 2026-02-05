@@ -32,26 +32,39 @@ def set_chinese_font():
     os_name = platform.system()
     print(f"当前操作系统: {os_name}，正在配置中文字体...")
 
+    # 先读取可用字体，再按平台挑选（避免设置了不存在的字体导致中文乱码/方块）
+    available_fonts = {f.name for f in fm.fontManager.ttflist}
+
+    def pick(candidates):
+        return [c for c in candidates if c in available_fonts]
+
     if os_name == 'Windows':
         # Windows系统: 优先使用微软雅黑，备选黑体
-        plt.rcParams['font.sans-serif'] = ['Microsoft YaHei', 'SimHei']
+        candidates = ['Microsoft YaHei', 'SimHei', 'Microsoft JhengHei UI', 'Arial Unicode MS']
+        picked = pick(candidates)
+        if picked:
+            plt.rcParams['font.sans-serif'] = picked
     elif os_name == 'Linux':
         # Linux系统: 尝试使用常见的开源中文字体
-        # 用户可能需要预先安装这些字体, e.g., on Debian/Ubuntu:
-        # sudo apt-get update && sudo apt-get install -y fonts-wqy-zenhei
-        plt.rcParams['font.sans-serif'] = ['WenQuanYi Zen Hei', 'Liberation Sans',  'WenQuanYi Micro Hei', 'Noto Sans CJK SC']
+        candidates = ['Noto Sans CJK SC', 'WenQuanYi Zen Hei', 'WenQuanYi Micro Hei', 'Source Han Sans SC', 'Arial Unicode MS']
+        picked = pick(candidates)
+        if picked:
+            plt.rcParams['font.sans-serif'] = picked
     elif os_name == 'Darwin':
-        # macOS系统: 优先使用苹方，备选黑体-简
-        plt.rcParams['font.sans-serif'] = ['PingFang SC', 'Heiti SC', 'STHeiti']
+        # macOS系统：部分 Python/Matplotlib 环境可能识别不到 PingFang/Heiti，
+        # 这里动态选择实际可用字体。
+        candidates = ['PingFang SC', 'Heiti SC', 'STHeiti', 'Songti SC', 'Arial Unicode MS']
+        picked = pick(candidates)
+        if picked:
+            plt.rcParams['font.sans-serif'] = picked
     else:
         print("未知的操作系统，使用matplotlib默认字体，中文可能无法正常显示。")
 
     # 解决负号'-'显示为方块的问题
     plt.rcParams['axes.unicode_minus'] = False
 
-    # 检查字体是否可用
-    available_fonts = [f.name for f in fm.fontManager.ttflist]
-    #print("可用的字体:", available_fonts)
+    # 解决负号'-'显示为方块的问题
+    plt.rcParams['axes.unicode_minus'] = False
 
 # 在脚本开始时调用函数进行设置
 set_chinese_font()
