@@ -12,7 +12,7 @@ pic/
 # 日志文件
 *.log
 *.log.*
-
+__pycache__/
 # IDE 配置文件（VS Code 配置通常不提交，如需提交可删除此行）
 .vscode/
 .idea/
