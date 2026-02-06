@@ -1,8 +1,8 @@
 #!/bin/bash
 # schedule_task.sh - MacOS版本
 # 设置定时任务（使用 launchd）
-# 每天北京时间 14:30 和 15:10 自动运行
-
+# 每天北京时间 9:35:00 和 14:20:00 自动运行
+#
 # 颜色定义
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -12,8 +12,8 @@ NC='\033[0m' # No Color
 # 设置变量
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PROJECT_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
-TASK_NAME_1="com.gupiao.autoprocess.1430"
-TASK_NAME_2="com.gupiao.autoprocess.1510"
+TASK_NAME_1="com.gupiao.autoprocess.0935"
+TASK_NAME_2="com.gupiao.autoprocess.1420"
 LOCAL_TIME_1="9:35:00"
 LOCAL_TIME_2="14:20:00"
 RUN_ALL_SCRIPT="${SCRIPT_DIR}/run_all_tasks.sh"
@@ -51,6 +51,22 @@ if [ ! -f "$RUN_ALL_SCRIPT" ]; then
     exit 1
 fi
 
+# 检查并设置脚本执行权限
+echo "检查脚本执行权限..."
+SCRIPTS_TO_CHECK=(
+    "${SCRIPT_DIR}/run_webhtml.sh"
+    "${SCRIPT_DIR}/autoPython_bat.sh"
+    "$RUN_ALL_SCRIPT"
+)
+
+for script in "${SCRIPTS_TO_CHECK[@]}"; do
+    if [ ! -x "$script" ]; then
+        echo -e "${YELLOW}设置执行权限: $(basename "$script")${NC}"
+        chmod +x "$script"
+    fi
+done
+echo -e "${GREEN}✅ 所有脚本执行权限已设置${NC}"
+
 # 检查虚拟环境
 if [ ! -d "$VENV_DIR" ]; then
     echo -e "${YELLOW}警告: 未找到虚拟环境: $VENV_DIR${NC}"
@@ -69,7 +85,7 @@ if [ ! -d "$LAUNCH_AGENTS_DIR" ]; then
     mkdir -p "$LAUNCH_AGENTS_DIR"
 fi
 
-# 函数：创建 plist 文件
+# 函数：创建 plist 文件（只在工作日 Mon-Fri 运行）
 create_plist() {
     local task_name=$1
     local hour=$2
@@ -89,12 +105,53 @@ create_plist() {
         <string>${RUN_ALL_SCRIPT}</string>
     </array>
     <key>StartCalendarInterval</key>
-    <dict>
-        <key>Hour</key>
-        <integer>${hour}</integer>
-        <key>Minute</key>
-        <integer>${minute}</integer>
-    </dict>
+    <array>
+        <!-- 周一 -->
+        <dict>
+            <key>Weekday</key>
+            <integer>1</integer>
+            <key>Hour</key>
+            <integer>${hour}</integer>
+            <key>Minute</key>
+            <integer>${minute}</integer>
+        </dict>
+        <!-- 周二 -->
+        <dict>
+            <key>Weekday</key>
+            <integer>2</integer>
+            <key>Hour</key>
+            <integer>${hour}</integer>
+            <key>Minute</key>
+            <integer>${minute}</integer>
+        </dict>
+        <!-- 周三 -->
+        <dict>
+            <key>Weekday</key>
+            <integer>3</integer>
+            <key>Hour</key>
+            <integer>${hour}</integer>
+            <key>Minute</key>
+            <integer>${minute}</integer>
+        </dict>
+        <!-- 周四 -->
+        <dict>
+            <key>Weekday</key>
+            <integer>4</integer>
+            <key>Hour</key>
+            <integer>${hour}</integer>
+            <key>Minute</key>
+            <integer>${minute}</integer>
+        </dict>
+        <!-- 周五 -->
+        <dict>
+            <key>Weekday</key>
+            <integer>5</integer>
+            <key>Hour</key>
+            <integer>${hour}</integer>
+            <key>Minute</key>
+            <integer>${minute}</integer>
+        </dict>
+    </array>
     <key>StandardOutPath</key>
     <string>${PROJECT_ROOT}/logs/${task_name}.log</string>
     <key>StandardErrorPath</key>
@@ -107,6 +164,8 @@ create_plist() {
         <string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
         <key>HOME</key>
         <string>${HOME}</string>
+        <key>PYTHONPATH</key>
+        <string>${PROJECT_ROOT}</string>
     </dict>
 </dict>
 </plist>
@@ -150,16 +209,16 @@ launchctl unload "${LAUNCH_AGENTS_DIR}/${TASK_NAME_2}.plist" 2>/dev/null
 launchctl bootout gui/"$(id -u)" "${LAUNCH_AGENTS_DIR}/${TASK_NAME_1}.plist" 2>/dev/null
 launchctl bootout gui/"$(id -u)" "${LAUNCH_AGENTS_DIR}/${TASK_NAME_2}.plist" 2>/dev/null
 
-# ===== 创建第一个任务 (14:30) =====
+# ===== 创建第一个任务 (9 35) =====
 echo ""
 echo "创建任务 1: ${TASK_NAME_1} (${LOCAL_TIME_1})..."
-PLIST_1=$(create_plist "$TASK_NAME_1" 14 30)
+PLIST_1=$(create_plist "$TASK_NAME_1" 9 35)
 load_task "$TASK_NAME_1"
 
-# ===== 创建第二个任务 (15:10) =====
+# ===== 创建第二个任务 (14 20) =====
 echo ""
 echo "创建任务 2: ${TASK_NAME_2} (${LOCAL_TIME_2})..."
-PLIST_2=$(create_plist "$TASK_NAME_2" 15 10)
+PLIST_2=$(create_plist "$TASK_NAME_2" 14 20)
 load_task "$TASK_NAME_2"
 
 # 显示任务详情

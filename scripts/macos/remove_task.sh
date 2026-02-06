@@ -9,8 +9,8 @@ YELLOW='\033[1;33m'
 NC='\033[0m' # No Color
 
 # 设置变量
-TASK_NAME_1="com.gupiao.autoprocess.1430"
-TASK_NAME_2="com.gupiao.autoprocess.1510"
+TASK_NAME_1="com.gupiao.autoprocess.0935"
+TASK_NAME_2="com.gupiao.autoprocess.1420"
 LAUNCH_AGENTS_DIR="${HOME}/Library/LaunchAgents"
 
 echo "========================================"
