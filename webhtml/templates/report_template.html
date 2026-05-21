@@ -430,7 +430,7 @@
                     <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
                         <h2 class="section-title text-xl font-bold text-text-primary">A股市场温度</h2>
                         <div class="stat-highlight">
-                            <span class="text-2xl md:text-3xl font-bold data-cell" style="color: {{ '#22c55e' if up_down.up > up_down.down else '#ef4444' }}">
+                            <span class="text-2xl md:text-3xl font-bold data-cell" style="color: {{ '#22c55e' if up_down.is_available and up_down.up > up_down.down else '#ef4444' if up_down.is_available else '#94a3b8' }}">
                                 {{ up_down.up }} : {{ up_down.down }}
                             </span>
                             <span class="text-xs text-text-secondary mt-1">{{ up_down.label }}</span>

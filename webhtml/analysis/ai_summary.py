@@ -26,6 +26,8 @@ def build_prompt_from_view(view: Dict) -> str:
     up_down = view.get("up_down", {})
     sectors = view.get("sectors", [])
     globals_groups = view.get("globals_groups", [])
+    risks = view.get("risks", [])
+    market_signals = view.get("market_signals", [])
 
     # 选取Top 3、Bottom 3行业名
     top_names = [s.get("etf_name", "") for s in sectors[:3]]
@@ -40,16 +42,34 @@ def build_prompt_from_view(view: Dict) -> str:
     globals_flat = []
     for g in globals_groups:
         for item in g.get("items", []):
-            globals_flat.append(f"{item['indicator']}:{item['value_or_change_str']}")
-    globals_str = ", ".join(globals_flat[:4])
+            globals_flat.append(f"{item['indicator']}:{item['value_or_change_str']}({item.get('interpretation','')})")
+    globals_str = ", ".join(globals_flat)
+
+    risks_flat = [
+        f"{item.get('name','')}:{item.get('value_or_change_str','')}({item.get('interpretation','')})"
+        for item in risks
+    ]
+    risks_str = ", ".join(risks_flat)
+
+    signal_lines = []
+    for s in market_signals:
+        evidence = " / ".join(s.get("evidence", []))
+        signal_lines.append(
+            f"- {s.get('signal','')}: impact={s.get('impact','')}, strength={s.get('strength','')}, "
+            f"confidence={s.get('confidence','')}; {s.get('summary','')}; evidence={evidence}"
+        )
+    signals_str = "\n".join(signal_lines) if signal_lines else "- 无明确跨资产主导信号"
 
     prompt = (
         "你是一位专业的、风格中立客观的中国金融分析师和操盘手。请根据以下今日国内外、港股、美股、汇率、加密货币等收盘后的结构化数据，"
         "生成一份不超过200字的、高度概括的当日市场核心结论。\n"
         "必须覆盖：市场整体评价、核心领涨主线(1-3个)、领跌板块(1-2个)、市场风格倾向、关键全球/风险信号。\n\n"
+        "约束：不得推翻结构化信号，不得新增未给出的事实；如信号冲突，必须指出主导矛盾和传导是否顺畅。\n\n"
         f"A股市场温度：{fmt_idx(0)}, {fmt_idx(1)}, {fmt_idx(2)}; 涨跌比 {up_down.get('up',0)}:{up_down.get('down',0)}（{up_down.get('label','')}），涨跌比{up_down.get('activityPct','0.0%')}。\n"
         f"行业Top: {', '.join(top_names)}; 行业Bottom: {', '.join(bottom_names)}。\n"
-        f"全球与风险信号: {globals_str}。\n"
+        f"全球市场逐项信号: {globals_str}。\n"
+        f"风险偏好逐项信号: {risks_str}。\n"
+        f"结构化跨资产主导信号:\n{signals_str}\n"
         "请直接给出复盘中文点评，不要客套话（避免AI语言生硬感）。"
     )
     return prompt
@@ -88,5 +108,4 @@ def generate_ai_summary(view: Dict) -> str:
         return "(未启用AI) 今日市场温度与风格已汇总，详见各表格。"
     prompt = build_prompt_from_view(view)
     return _deepseek_chat(prompt)
-
 

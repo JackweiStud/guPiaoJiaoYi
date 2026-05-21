@@ -9,6 +9,11 @@ from __future__ import annotations
 
 from typing import Dict, Any, List
 
+from webhtml.analysis.market_interpreter import (
+    build_market_context,
+    interpret_global_item,
+    interpret_risk_item,
+)
 
 def _pct_to_str(p: float | None) -> str:
     if p is None:
@@ -23,19 +28,6 @@ def _class_by_value(v: float | None) -> str:
     return "positive" if v >= 0 else "negative"
 
 
-def _global_interpretation(item: Dict[str, Any]) -> str:
-    if item.get("indicator") == "美元/离岸CNH":
-        value = item.get("value_or_change")
-        if value is None:
-            return "汇率方向待确认"
-        if value > 0:
-            return "美元兑离岸人民币上行，人民币走弱"
-        if value < 0:
-            return "美元兑离岸人民币下行，人民币走强"
-        return "美元兑离岸人民币基本持平"
-    return item.get("interpretation", "")
-
-
 def build_report_view(raw: Dict[str, Any]) -> Dict[str, Any]:
     """
     将原始市场数据转换为HTML模板渲染所需的结构化数据
@@ -47,6 +39,8 @@ def build_report_view(raw: Dict[str, Any]) -> Dict[str, Any]:
         "current_year": raw.get("date", "0000")[:4],
         "ai_summary": "(AI未开启)",
     }
+    market_context = build_market_context(raw)
+    result["market_signals"] = market_context.get("market_signals", [])
 
     # A股市场温度
     # 构建A股市场温度（指数）部分
@@ -67,7 +61,8 @@ def build_report_view(raw: Dict[str, Any]) -> Dict[str, Any]:
     up_down = raw.get("up_down", {"up": 0, "down": 0})
     up_count = up_down.get("up", 0)
     down_count = up_down.get("down", 0)
-    total_count = up_count + down_count
+    has_up_down = up_count is not None and down_count is not None
+    total_count = up_count + down_count if has_up_down else 0
     
     # 判断逻辑：当up占比超过(up+down)的80%为普涨；当down占比超过(up+down)的80%为普跌；其他为分化
     if total_count > 0:
@@ -79,15 +74,18 @@ def build_report_view(raw: Dict[str, Any]) -> Dict[str, Any]:
             label = "普跌"
         else:
             label = "分化"
-    else:
+    elif has_up_down:
         label = "分化"
+    else:
+        label = "数据缺失"
 
     result["up_down"] = {
-        "up": up_down.get("up", 0), 
-        "down": up_down.get("down", 0), 
-        "activityPct": up_down.get("activityPct", "0.0%"),
+        "up": up_count if up_count is not None else "-", 
+        "down": down_count if down_count is not None else "-", 
+        "activityPct": up_down.get("activityPct", "-"),
         "label": label, 
-        "class": _class_by_value(up_down.get("up", 0) - up_down.get("down", 0))
+        "class": _class_by_value((up_count - down_count) if has_up_down else None),
+        "is_available": has_up_down,
     }
 
     # 市场风格与规模（分组）
@@ -156,17 +154,15 @@ def build_report_view(raw: Dict[str, Any]) -> Dict[str, Any]:
                 price_str = f"{price:.4f}"
         else:
             price_str = "-"
+        risk_interpretation = interpret_risk_item(r, market_context)
         risks_view.append({
             "category": r["category"],
             "name": r["name"],
+            "code": r.get("code", ""),
             "price_str": price_str,
             "change_class": _class_by_value(r.get("value_or_change", 0.0)),
-            # 如果名称以"收益率"结尾，则格式化为"↑ xx.xx%"，否则用通用百分比格式化函数
-            "value_or_change_str": (
-                f"↑ {r['value_or_change']:.2f}%" if r["name"].endswith("收益率")
-                else _pct_to_str(r.get("value_or_change", 0.0))
-            ),
-            "interpretation": r.get("interpretation", ""),
+            "value_or_change_str": _pct_to_str(r.get("value_or_change", 0.0)),
+            "interpretation": risk_interpretation["interpretation"],
             "row_class": "bg-slate-50" if i % 2 == 0 else "",
         })
     result["risks"] = risks_view
@@ -190,12 +186,14 @@ def build_report_view(raw: Dict[str, Any]) -> Dict[str, Any]:
                     price_str = f"{price:.4f}"
             else:
                 price_str = "-"
+            global_interpretation = interpret_global_item(it, market_context)
             vitems.append({
                 "indicator": it["indicator"],
+                "code": it.get("code", ""),
                 "price_str": price_str,
                 "change_class": _class_by_value(it.get("value_or_change", 0.0)),
                 "value_or_change_str": _pct_to_str(it.get("value_or_change", 0.0)),
-                "interpretation": _global_interpretation(it),
+                "interpretation": global_interpretation["interpretation"],
                 "row_class": "bg-slate-50" if i % 2 == 0 else "",
             })
         globals_groups.append({"category": cat, "items": vitems})

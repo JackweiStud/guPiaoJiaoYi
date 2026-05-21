@@ -57,6 +57,9 @@ RISKS = [
     {"category": "国内安全", "name": "30年国债ETF", "code": "511090"},
     {"category": "全球避险", "name": "COMEX黄金", "code": "GLOBAL_COMEX_GOLD"},
     {"category": "全球风险锚", "name": "10年期美债收益率", "code": "US10Y"},
+    {"category": "全球风险锚", "name": "30年期美债收益率", "code": "US30Y"},
+    {"category": "全球风险锚", "name": "英国10年期国债收益率", "code": "UK10Y"},
+    {"category": "全球风险锚", "name": "日本10年期国债收益率", "code": "JP10Y"},
     {"category": "做多A股", "name": "YINN富时3倍做多中国", "code": "YINN"},
 ]
 
@@ -73,5 +76,4 @@ GLOBALS = [
     {"category": "加密货币", "indicator": "比特币(BTC)", "code": "BTC-USD"},
     {"category": "加密货币", "indicator": "以太坊(ETH)", "code": "ETH-USD"},
 ]
-
 

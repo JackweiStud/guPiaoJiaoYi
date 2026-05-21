@@ -12,6 +12,9 @@ from __future__ import annotations
 
 from typing import Dict, Any, List, Optional, Tuple, Callable
 from datetime import datetime, date
+from concurrent.futures import ThreadPoolExecutor, as_completed
+import math
+from io import StringIO
 import logging
 import pandas as pd
 import time
@@ -32,6 +35,7 @@ except Exception:  # noqa: BLE001
 
 import requests
 import re
+import urllib3
 
 # ============================================================
 # 新浪实时行情接口 (作为东方财富接口的备用数据源)
@@ -409,6 +413,129 @@ def buildIndexes(watch_indexes: List[Dict[str, Any]],
 输入参数为: mock_up_down 为回退数据。
 返回: (字典 {up, down, activityPct}, 是否使用回退)。
 """
+def _build_up_down_from_spot_df(df: Any) -> Optional[Dict[str, Any]]:
+    """从 A 股快照的涨跌幅列统计上涨/下跌家数。"""
+    if df is None or getattr(df, "empty", True):
+        return None
+    col = firstCol(df, ["涨跌幅", "涨跌幅(%)", "涨跌幅%", "change_pct"])
+    if not col:
+        return None
+    changes = df[col].map(toFloatMaybe).dropna()
+    up = int((changes > 0).sum())
+    down = int((changes < 0).sum())
+    total = up + down
+    if total <= 0:
+        return None
+    return {
+        "up": up,
+        "down": down,
+        "activityPct": f"{round(up / total * 100, 1)}%",
+    }
+
+
+def _build_up_down_from_changes(changes: List[float]) -> Optional[Dict[str, Any]]:
+    valid = [x for x in changes if isinstance(x, (int, float)) and not math.isnan(float(x))]
+    up = sum(1 for x in valid if x > 0)
+    down = sum(1 for x in valid if x < 0)
+    total = up + down
+    if total <= 0:
+        return None
+    return {
+        "up": int(up),
+        "down": int(down),
+        "activityPct": f"{round(up / total * 100, 1)}%",
+    }
+
+
+def _fetch_eastmoney_up_down() -> Optional[Dict[str, Any]]:
+    """通过东方财富轻量行情接口统计全A涨跌家数。"""
+    try:
+        index_result = _fetch_eastmoney_index_breadth()
+        if index_result is not None:
+            return index_result
+    except Exception as e:  # noqa: BLE001
+        logging.debug("东方财富指数宽度接口失败: %s", e)
+    return _fetch_eastmoney_clist_breadth()
+
+
+def _fetch_eastmoney_index_breadth() -> Optional[Dict[str, Any]]:
+    """通过主要市场指数的涨跌家数字段快速统计市场宽度。"""
+    url = "https://push2.eastmoney.com/api/qt/ulist.np/get"
+    params = {
+        "secids": "1.000001,0.399001,0.899050",
+        "ut": "bd1d9ddb04089700cf9c27f6f7426281",
+        "fields": "f12,f14,f104,f105,f106",
+    }
+    resp = requests.get(url, params=params, timeout=10)
+    resp.raise_for_status()
+    payload = resp.json().get("data") or {}
+    up = 0
+    down = 0
+    for row in payload.get("diff") or []:
+        up += int(toFloatMaybe(row.get("f104")) or 0)
+        down += int(toFloatMaybe(row.get("f105")) or 0)
+    total = up + down
+    if total <= 0:
+        return None
+    return {
+        "up": up,
+        "down": down,
+        "activityPct": f"{round(up / total * 100, 1)}%",
+    }
+
+
+def _fetch_eastmoney_clist_breadth() -> Optional[Dict[str, Any]]:
+    """通过东方财富全A列表分页统计涨跌家数，作为指数宽度字段的备用。"""
+    url = "https://push2.eastmoney.com/api/qt/clist/get"
+    params = {
+        "pn": 1,
+        "pz": 100,
+        "po": 1,
+        "np": 1,
+        "ut": "bd1d9ddb04089700cf9c27f6f7426281",
+        "fltt": 2,
+        "invt": 2,
+        "fid": "f3",
+        "fs": "m:0+t:6,m:0+t:80,m:1+t:2,m:1+t:23",
+        "fields": "f3",
+    }
+
+    def fetch_page(page: int) -> Tuple[int, int, List[float]]:
+        page_params = dict(params)
+        page_params["pn"] = page
+        resp = requests.get(url, params=page_params, timeout=15)
+        resp.raise_for_status()
+        payload = resp.json().get("data") or {}
+        values = []
+        for row in payload.get("diff") or []:
+            value = toFloatMaybe(row.get("f3"))
+            if value is not None:
+                values.append(float(value))
+        return int(payload.get("total") or 0), len(payload.get("diff") or []), values
+
+    total, page_size, first_values = fetch_page(1)
+    if not total or not page_size:
+        return None
+    page_count = math.ceil(total / page_size)
+    values = list(first_values)
+    if page_count > 1:
+        failed_pages = []
+        with ThreadPoolExecutor(max_workers=6) as executor:
+            futures = [executor.submit(fetch_page, page) for page in range(2, page_count + 1)]
+            for future in as_completed(futures):
+                try:
+                    _, _, page_values = future.result()
+                    values.extend(page_values)
+                except Exception as e:  # noqa: BLE001
+                    failed_pages.append(str(e))
+        coverage = len(values) / total if total > 0 else 0.0
+        if failed_pages and coverage < 0.5:
+            raise RuntimeError(f"东方财富轻量接口分页失败过多，覆盖率 {coverage:.1%}")
+        if failed_pages:
+            logging.warning("东方财富轻量接口部分分页失败，按 %.1f%% 样本估算涨跌家数", coverage * 100)
+    return _build_up_down_from_changes(values)
+
+
 def buildUpDown(mock_up_down: Dict[str, Any]) -> Tuple[Dict[str, Any], bool]:
 
     try:
@@ -448,15 +575,29 @@ def buildUpDown(mock_up_down: Dict[str, Any]) -> Tuple[Dict[str, Any], bool]:
         return result, False
 
     except Exception as e:  # noqa: BLE001
-        logging.warning("涨跌家数获取失败(乐咕接口)，使用mock: %s", e)
-        # 兜底保证包含 activityPct
-        up = int(mock_up_down.get("up", 0))
-        down = int(mock_up_down.get("down", 0))
-        if "activityPct" in mock_up_down:
-            activity = mock_up_down.get("activityPct", "0.0%")
-        else:
-            activity = f"{round((up / (up + down) * 100) if (up + down) > 0 else 0.0, 1)}%"
-        return {"up": up, "down": down, "activityPct": activity}, True
+        logging.warning("涨跌家数获取失败(乐咕接口)，尝试东方财富轻量接口备用: %s", e)
+
+    try:
+        eastmoney_result = _fetch_eastmoney_up_down()
+        if eastmoney_result is not None:
+            logging.info("涨跌家数获取成功 (东方财富轻量接口备用)")
+            return eastmoney_result, False
+        raise RuntimeError("东方财富轻量接口无法统计涨跌家数")
+    except Exception as e:  # noqa: BLE001
+        logging.warning("涨跌家数获取失败(东方财富轻量接口)，尝试A股快照备用: %s", e)
+
+    try:
+        if ak is None:
+            raise RuntimeError("akshare 不可用")
+        spot_df = ak.stock_zh_a_spot_em()
+        fallback_result = _build_up_down_from_spot_df(spot_df)
+        if fallback_result is not None:
+            logging.info("涨跌家数获取成功 (东方财富A股快照备用)")
+            return fallback_result, False
+        raise RuntimeError("A股快照无法统计涨跌家数")
+    except Exception as e:  # noqa: BLE001
+        logging.warning("涨跌家数获取失败(A股快照备用)，标记为不可用: %s", e)
+        return {"up": None, "down": None, "activityPct": "-"}, True
 
 
 """功能: 生成风格ETF涨跌数据。
@@ -677,6 +818,44 @@ def getUs10yChangePct() -> Optional[float]:
     return getUsStockChangePct("^TNX")
 
 
+def _fetch_tradingeconomics_bond_yield(code: str) -> Optional[Tuple[float, float]]:
+    """获取 TradingEconomics 主要国家10年期国债收益率。
+
+    返回值为 (收益率日变动百分比, 当前收益率)。TradingEconomics 表格的 Day 是
+    收益率点位变动，报告沿用现有风险表的百分比变化口径。
+    """
+    config = {
+        "UK10Y": ("https://tradingeconomics.com/united-kingdom/government-bond-yield", "UK 10Y"),
+        "JP10Y": ("https://tradingeconomics.com/japan/government-bond-yield", "Japan 10Y"),
+    }.get(code)
+    if config is None:
+        return None
+
+    url, bond_name = config
+    try:
+        urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+        resp = requests.get(url, headers={"User-Agent": "Mozilla/5.0"}, timeout=20, verify=False)
+        resp.raise_for_status()
+        tables = pd.read_html(StringIO(resp.text))
+        if not tables:
+            return None
+        table = tables[0]
+        row = table[table["Bonds"].astype(str).str.strip() == bond_name]
+        if row.empty:
+            return None
+        current_yield = toFloatMaybe(row.iloc[0].get("Yield"))
+        day_change = toFloatMaybe(str(row.iloc[0].get("Day", "")).replace("%", ""))
+        if current_yield is None or day_change is None:
+            return None
+        previous_yield = current_yield - day_change
+        if previous_yield <= 0:
+            return float(day_change), float(current_yield)
+        return float(day_change / previous_yield * 100), float(current_yield)
+    except Exception as e:  # noqa: BLE001
+        logging.warning("获取全球国债收益率失败 %s: %s", code, e)
+        return None
+
+
 def getHkChangePct(code: str) -> Optional[float]:
     """功能: 获取香港市场指标当日涨跌幅(%)。
     参数: code(如 HSI、HSTECH)。返回: 浮点数涨跌幅或 None。
@@ -812,6 +991,7 @@ def buildRisks(watch_risks: List[Dict[str, Any]], mock_risks: List[Dict[str, Any
         domestic_etf_codes = []  # 国内ETF（用新浪）
         global_tickers = []       # 全球资产（用yfinance批量）
         code_to_ticker = {}       # 代码到ticker的映射
+        te_bond_codes = []         # TradingEconomics 国债收益率
         
         for r in watch_risks:
             code = r["code"]
@@ -821,6 +1001,11 @@ def buildRisks(watch_risks: List[Dict[str, Any]], mock_risks: List[Dict[str, Any
             elif code == "US10Y":
                 global_tickers.append("^TNX")
                 code_to_ticker[code] = "^TNX"
+            elif code == "US30Y":
+                global_tickers.append("^TYX")
+                code_to_ticker[code] = "^TYX"
+            elif code in {"UK10Y", "JP10Y"}:
+                te_bond_codes.append(code)
             elif code == "YINN":
                 global_tickers.append("YINN")
                 code_to_ticker[code] = "YINN"
@@ -877,6 +1062,12 @@ def buildRisks(watch_risks: List[Dict[str, Any]], mock_risks: List[Dict[str, Any
         
         # 构建输出
         out: List[Dict[str, Any]] = []
+        te_bond_map: Dict[str, Tuple[float, float]] = {}
+        for bond_code in te_bond_codes:
+            bond_result = _fetch_tradingeconomics_bond_yield(bond_code)
+            if bond_result is not None:
+                te_bond_map[bond_code] = bond_result
+
         for r in watch_risks:
             code = r["code"]
             val: Optional[float] = None
@@ -888,6 +1079,8 @@ def buildRisks(watch_risks: List[Dict[str, Any]], mock_risks: List[Dict[str, Any
                 ticker = code_to_ticker[code]
                 val = global_pct_map.get(ticker)
                 price = global_price_map.get(ticker)
+            elif code in te_bond_map:
+                val, price = te_bond_map[code]
             else:
                 # 国内ETF用新浪接口
                 result = getSpecificEtfChangePctWithPrice(code)
