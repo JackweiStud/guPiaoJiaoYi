@@ -706,6 +706,33 @@ def getCryptoChangePct(code: str) -> Optional[float]:
 
     return  getUsStockChangePct(code)
 
+
+def _get_yfinance_quote_price_change(ticker: str, fallback_price: Optional[float] = None) -> Tuple[Optional[float], Optional[float]]:
+    """从 yfinance quote 快照补取最新价和昨收涨跌幅。"""
+    if yf is None:
+        return fallback_price, None
+    try:
+        fast_info = yf.Ticker(ticker).fast_info
+        last_price = toFloatMaybe(
+            fast_info.get("lastPrice") if hasattr(fast_info, "get") else getattr(fast_info, "lastPrice", None)
+        )
+        previous_close = toFloatMaybe(
+            fast_info.get("previousClose") if hasattr(fast_info, "get") else getattr(fast_info, "previousClose", None)
+        )
+        if previous_close is None:
+            previous_close = toFloatMaybe(
+                fast_info.get("regularMarketPreviousClose")
+                if hasattr(fast_info, "get")
+                else getattr(fast_info, "regularMarketPreviousClose", None)
+            )
+        price = last_price if last_price is not None else fallback_price
+        if price is not None and previous_close is not None and previous_close > 0:
+            return float(price), float((price - previous_close) / previous_close * 100)
+        return price, None
+    except Exception as e:
+        logging.debug("yfinance quote 快照获取失败 %s: %s", ticker, e)
+        return fallback_price, None
+
 def getSpecificEtfChangePct(code: str, sina_code: str = None) -> Optional[float]:
     """功能: 获取特定ETF最新一日涨跌幅(%)。
     优先使用新浪接口（更稳定），失败时使用东方财富接口备用。
@@ -931,32 +958,32 @@ def buildGlobals(watch_globals: List[Dict[str, Any]], mock_globals: List[Dict[st
                             else:
                                 closes = data['Close'][ticker]
                             
-                            # 不用 dropna，直接取最后两个有效值
-                            if closes is not None and len(closes) >= 2:
-                                last_close = closes.iloc[-1]
-                                prev_close = closes.iloc[-2]
-                                # 保存价格（取最后一个有效值）
-                                if pd.notna(last_close):
-                                    price_map[ticker] = float(last_close)
-                                elif pd.notna(prev_close):
-                                    price_map[ticker] = float(prev_close)
-                                # 计算涨跌幅
-                                if pd.notna(last_close) and pd.notna(prev_close) and prev_close > 0:
-                                    pct = ((last_close - prev_close) / prev_close) * 100
-                                    change_pct_map[ticker] = float(pct)
+                            # yfinance 会在不同市场日历下插入 NaN 行，必须按有效收盘价计算。
+                            valid_closes = closes.dropna() if closes is not None else None
+                            if valid_closes is not None and len(valid_closes) >= 1:
+                                last_close = float(valid_closes.iloc[-1])
+                                price_map[ticker] = last_close
+                                if len(valid_closes) >= 2:
+                                    prev_close = float(valid_closes.iloc[-2])
+                                    if prev_close > 0:
+                                        pct = ((last_close - prev_close) / prev_close) * 100
+                                        change_pct_map[ticker] = float(pct)
                                 else:
-                                    # 数据存在但无法计算涨跌幅（休市/nan），记录为 0
-                                    change_pct_map[ticker] = 0.0
+                                    quote_price, quote_pct = _get_yfinance_quote_price_change(ticker, last_close)
+                                    if quote_price is not None:
+                                        price_map[ticker] = quote_price
+                                    if quote_pct is not None:
+                                        change_pct_map[ticker] = quote_pct
                         except Exception:
                             continue
                     
-                    if change_pct_map:
+                    if change_pct_map or price_map:
                         logging.info(f"批量获取成功: {len(change_pct_map)}/{len(tickers)} 个")
                         break  # 成功则退出重试循环
             except Exception as e:
                 logging.warning(f"yfinance 第 {attempt+1} 次尝试失败: {e}")
         
-        if not change_pct_map:
+        if not change_pct_map and not price_map:
             logging.warning("yfinance 所有重试失败，全球数据使用 mock 数据")
         
         # 构建输出
@@ -968,7 +995,7 @@ def buildGlobals(watch_globals: List[Dict[str, Any]], mock_globals: List[Dict[st
             # 从批量结果获取，失败则用 mock
             val = change_pct_map.get(code)
             price = price_map.get(code)
-            if val is None:
+            if val is None and price is None:
                 mv = mock_map.get(code, {})
                 val = toFloatMaybe(mv.get("value_or_change", 0.0)) or 0.0
 
@@ -977,7 +1004,7 @@ def buildGlobals(watch_globals: List[Dict[str, Any]], mock_globals: List[Dict[st
                 "indicator": g["indicator"],
                 "code": code,
                 "price": price,  # 新增价格字段
-                "value_or_change": float(val or 0.0),
+                "value_or_change": float(val) if val is not None else None,
                 "interpretation": str(mock_map.get(code, {}).get("interpretation", "")),
             })
         
@@ -1107,4 +1134,3 @@ def fetch_all_data() -> Dict[str, Any]:
         "globals": globals_list,
         "_source": source_tag,
     }
-

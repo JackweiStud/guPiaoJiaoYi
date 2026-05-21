@@ -1,6 +1,10 @@
 ---
 name: market-report
-description: "用于触发 guPiaoJiaoYi 的行情/信号/AI分析流程并返回 JSON 摘要，适合 OpenClaw/TG 自动化。当用户说"检查ETF行情/生成A股金融日报/A股看盘/给我XXETF代码信号/A股的AI分析"时使用。"
+version: 1.0.0
+description: "Runs guPiaoJiaoYi market data, trading signals, and AI analysis, returns JSON. Use when: 检查ETF行情、生成A股金融日报、A股看盘、XX ETF代码信号、A股AI分析."
+allowed-tools:
+  - Bash
+user-invocable: true
 ---
 
 # 市场报告（Market Report）

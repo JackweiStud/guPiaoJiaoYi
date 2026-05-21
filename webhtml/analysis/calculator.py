@@ -10,13 +10,30 @@ from __future__ import annotations
 from typing import Dict, Any, List
 
 
-def _pct_to_str(p: float) -> str:
+def _pct_to_str(p: float | None) -> str:
+    if p is None:
+        return "-"
     sign = "+" if p >= 0 else ""
     return f"{sign}{p:.2f}%"
 
 
-def _class_by_value(v: float) -> str:
+def _class_by_value(v: float | None) -> str:
+    if v is None:
+        return "text-text-muted"
     return "positive" if v >= 0 else "negative"
+
+
+def _global_interpretation(item: Dict[str, Any]) -> str:
+    if item.get("indicator") == "美元/离岸CNH":
+        value = item.get("value_or_change")
+        if value is None:
+            return "汇率方向待确认"
+        if value > 0:
+            return "美元兑离岸人民币上行，人民币走弱"
+        if value < 0:
+            return "美元兑离岸人民币下行，人民币走强"
+        return "美元兑离岸人民币基本持平"
+    return item.get("interpretation", "")
 
 
 def build_report_view(raw: Dict[str, Any]) -> Dict[str, Any]:
@@ -178,7 +195,7 @@ def build_report_view(raw: Dict[str, Any]) -> Dict[str, Any]:
                 "price_str": price_str,
                 "change_class": _class_by_value(it.get("value_or_change", 0.0)),
                 "value_or_change_str": _pct_to_str(it.get("value_or_change", 0.0)),
-                "interpretation": it.get("interpretation", ""),
+                "interpretation": _global_interpretation(it),
                 "row_class": "bg-slate-50" if i % 2 == 0 else "",
             })
         globals_groups.append({"category": cat, "items": vitems})
@@ -186,5 +203,3 @@ def build_report_view(raw: Dict[str, Any]) -> Dict[str, Any]:
 
     result["_raw"] = raw
     return result
-
-

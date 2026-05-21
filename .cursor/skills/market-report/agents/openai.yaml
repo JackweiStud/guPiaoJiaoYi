@@ -1,4 +1,4 @@
 interface:
   display_name: "行情报告"
-  short_description: "运行行情/信号/AI分析并返回JSON"
+  short_description: "触发guPiaoJiaoYi行情/信号/AI分析流程，返回JSON摘要"
   default_prompt: "使用 $market-report 运行行情检查并返回 JSON 摘要。"
