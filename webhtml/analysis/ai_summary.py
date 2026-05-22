@@ -83,7 +83,7 @@ def _deepseek_chat(prompt: str) -> str:
         "输出严格控制在200字左右，避免夸张措辞（避免AI语言生硬感）。"
     )
     payload = {
-        "model": "deepseek-ai/DeepSeek-V3.1",
+        "model": "deepseek-ai/DeepSeek-V3.2",
         "messages": [
             {"role": "system", "content": system_prompt},
             {"role": "user", "content": prompt},

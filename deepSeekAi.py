@@ -27,7 +27,7 @@ class DeepSeekConfig(BaseModel):
     api_key: str = Field(..., description="API密钥")
     base_url: str = "https://api.siliconflow.cn/v1"
     system_prompt: str = "你是一位专业的、严谨的量化分析师,必须根据数据客观分析市场，成功率80%，短线之王，言辞犀利，语言精简, 根据用户提供的行情数据给出核心分析和2~5天的建议,默认成功率大于66%"
-    model: str = Field("deepseek-ai/DeepSeek-V3.1", description="官方指定模型名称R1")  # 修正模型名称deepseek-ai/DeepSeek-V3.1  deepseek-ai/DeepSeek-R1
+    model: str = Field("deepseek-ai/DeepSeek-V3.2", description="官方指定模型名称R1")  # 修正模型名称deepseek-ai/DeepSeek-V3.1  deepseek-ai/DeepSeek-R1
     max_tokens: int = 1024*160  # 与官方示例一致
     temperature: float = 0
     top_p: float = 0
