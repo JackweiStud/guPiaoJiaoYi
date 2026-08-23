@@ -1,5 +1,9 @@
 import os
 from datetime import datetime
+from dotenv import load_dotenv
+
+# 加载 .env 环境变量
+load_dotenv()
 
 
 # 项目根目录(以本文件为基准)
