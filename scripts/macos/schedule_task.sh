@@ -1,12 +1,16 @@
 #!/bin/bash
 # schedule_task.sh - MacOS版本
 # 设置定时任务（使用 launchd）
-# 每天北京时间 9:35:00 和 14:20:00 自动运行
-#
+# 自动识别系统本地时区并精准换算对齐【北京时间】A股交易时段：
+# - 任务 1: 北京时间 09:35:00 (开盘信号与分析)
+# - 任务 2: 北京时间 14:20:00 (尾盘信号与总结)
+
 # 颜色定义
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+CYAN='\033[0;36m'
 NC='\033[0m' # No Color
 
 # 设置变量
@@ -14,245 +18,146 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PROJECT_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
 TASK_NAME_1="com.gupiao.autoprocess.0935"
 TASK_NAME_2="com.gupiao.autoprocess.1420"
-LOCAL_TIME_1="9:35:00"
-LOCAL_TIME_2="14:20:00"
 RUN_ALL_SCRIPT="${SCRIPT_DIR}/run_all_tasks.sh"
 LOG_FILE="${PROJECT_ROOT}/logs/auto_run.log"
-VENV_DIR="${PROJECT_ROOT}/venv"
+VENV_PYTHON="${PROJECT_ROOT}/venv/bin/python"
+LAUNCH_AGENTS_DIR="${HOME}/Library/LaunchAgents"
 
 # 确保日志目录存在
 mkdir -p "${PROJECT_ROOT}/logs"
+mkdir -p "$LAUNCH_AGENTS_DIR"
 
-# LaunchAgents 目录
-LAUNCH_AGENTS_DIR="${HOME}/Library/LaunchAgents"
+# 确定 Python 解释器
+PYTHON_CMD="python3"
+if [ -f "$VENV_PYTHON" ]; then
+    PYTHON_CMD="$VENV_PYTHON"
+fi
 
 # 显示标题
 echo "========================================"
-echo "MacOS 自动任务计划设置工具"
+echo "MacOS 自动任务计划设置工具 (时区自适应)"
 echo "========================================"
-echo "将创建两个定时任务:"
-echo "  - ${TASK_NAME_1} (北京时间 ${LOCAL_TIME_1})"
-echo "  - ${TASK_NAME_2} (北京时间 ${LOCAL_TIME_2})"
+echo "目标 A 股交易时段 (北京时间 CST, UTC+8):"
+echo "  - 开盘任务: 周一至周五 09:35"
+echo "  - 尾盘任务: 周一至周五 14:20"
 echo ""
 
 # 检查脚本文件是否存在
-if [ ! -f "${SCRIPT_DIR}/run_webhtml.sh" ]; then
-    echo -e "${RED}错误: 未找到脚本文件 ${SCRIPT_DIR}/run_webhtml.sh${NC}"
-    exit 1
-fi
-
-if [ ! -f "${SCRIPT_DIR}/autoPython_bat.sh" ]; then
-    echo -e "${RED}错误: 未找到脚本文件 ${SCRIPT_DIR}/autoPython_bat.sh${NC}"
-    exit 1
-fi
-
-if [ ! -f "$RUN_ALL_SCRIPT" ]; then
-    echo -e "${RED}错误: 未找到脚本文件 $RUN_ALL_SCRIPT${NC}"
-    exit 1
-fi
-
-# 检查并设置脚本执行权限
-echo "检查脚本执行权限..."
-SCRIPTS_TO_CHECK=(
-    "${SCRIPT_DIR}/run_webhtml.sh"
-    "${SCRIPT_DIR}/autoPython_bat.sh"
-    "$RUN_ALL_SCRIPT"
-)
-
-for script in "${SCRIPTS_TO_CHECK[@]}"; do
-    if [ ! -x "$script" ]; then
-        echo -e "${YELLOW}设置执行权限: $(basename "$script")${NC}"
-        chmod +x "$script"
-    fi
-done
-echo -e "${GREEN}✅ 所有脚本执行权限已设置${NC}"
-
-# 检查虚拟环境
-if [ ! -d "$VENV_DIR" ]; then
-    echo -e "${YELLOW}警告: 未找到虚拟环境: $VENV_DIR${NC}"
-    echo -e "${YELLOW}请先运行: cd ${PROJECT_ROOT} && python3 -m venv venv${NC}"
-    echo -e "${YELLOW}然后安装依赖: source venv/bin/activate && pip install -r requirements.txt && pip install -r webhtml/requirements.txt${NC}"
-    read -p "是否继续? (y/n): " -n 1 -r
-    echo
-    if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+for s in "${SCRIPT_DIR}/run_webhtml.sh" "${SCRIPT_DIR}/autoPython_bat.sh" "$RUN_ALL_SCRIPT"; do
+    if [ ! -f "$s" ]; then
+        echo -e "${RED}错误: 未找到脚本文件 $s${NC}"
         exit 1
     fi
-fi
+    chmod +x "$s"
+done
+echo -e "${GREEN}✅ 所有脚本执行权限已就绪${NC}"
 
-# 创建 LaunchAgents 目录（如果不存在）
-if [ ! -d "$LAUNCH_AGENTS_DIR" ]; then
-    echo "创建 LaunchAgents 目录..."
-    mkdir -p "$LAUNCH_AGENTS_DIR"
-fi
+# 使用 Python 自动计算本地时区换算并生成 plist
+echo ""
+echo -e "${CYAN}正在计算本地时区转换并生成任务配置...${NC}"
 
-# 函数：创建 plist 文件（只在工作日 Mon-Fri 运行）
-create_plist() {
-    local task_name=$1
-    local hour=$2
-    local minute=$3
-    local plist_file="${LAUNCH_AGENTS_DIR}/${task_name}.plist"
+$PYTHON_CMD - << 'EOF'
+import os
+import plistlib
+from datetime import datetime
+import zoneinfo
+
+PROJECT_ROOT = os.environ.get("PROJECT_ROOT", os.path.abspath(os.path.join(os.path.dirname(__file__), "../..") if "__file__" in locals() else os.getcwd()))
+LAUNCH_AGENTS_DIR = os.path.expanduser("~/Library/LaunchAgents")
+RUN_ALL_SCRIPT = os.path.join(PROJECT_ROOT, "scripts/macos/run_all_tasks.sh")
+
+tz_cst = zoneinfo.ZoneInfo("Asia/Shanghai")
+now_local = datetime.now().astimezone()
+tz_local = now_local.tzinfo
+tz_name = now_local.strftime("%Z")
+utc_offset = now_local.strftime("%z")
+
+tasks = [
+    ("com.gupiao.autoprocess.0935", 9, 35, "开盘任务 (北京时间 09:35)"),
+    ("com.gupiao.autoprocess.1420", 14, 20, "尾盘任务 (北京时间 14:20)")
+]
+
+weekday_names = ["周日", "周一", "周二", "周三", "周四", "周五", "周六"]
+
+print(f"本地系统时区: {tz_name} (UTC{utc_offset[:3]}:{utc_offset[3:]})")
+print("-" * 50)
+
+for task_name, bj_h, bj_m, desc in tasks:
+    calendar_intervals = []
+    local_days_list = []
+    local_time_str = ""
     
-    cat > "$plist_file" << EOF
-<?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-<plist version="1.0">
-<dict>
-    <key>Label</key>
-    <string>${task_name}</string>
-    <key>ProgramArguments</key>
-    <array>
-        <string>/bin/bash</string>
-        <string>${RUN_ALL_SCRIPT}</string>
-    </array>
-    <key>StartCalendarInterval</key>
-    <array>
-        <!-- 周一 -->
-        <dict>
-            <key>Weekday</key>
-            <integer>1</integer>
-            <key>Hour</key>
-            <integer>${hour}</integer>
-            <key>Minute</key>
-            <integer>${minute}</integer>
-        </dict>
-        <!-- 周二 -->
-        <dict>
-            <key>Weekday</key>
-            <integer>2</integer>
-            <key>Hour</key>
-            <integer>${hour}</integer>
-            <key>Minute</key>
-            <integer>${minute}</integer>
-        </dict>
-        <!-- 周三 -->
-        <dict>
-            <key>Weekday</key>
-            <integer>3</integer>
-            <key>Hour</key>
-            <integer>${hour}</integer>
-            <key>Minute</key>
-            <integer>${minute}</integer>
-        </dict>
-        <!-- 周四 -->
-        <dict>
-            <key>Weekday</key>
-            <integer>4</integer>
-            <key>Hour</key>
-            <integer>${hour}</integer>
-            <key>Minute</key>
-            <integer>${minute}</integer>
-        </dict>
-        <!-- 周五 -->
-        <dict>
-            <key>Weekday</key>
-            <integer>5</integer>
-            <key>Hour</key>
-            <integer>${hour}</integer>
-            <key>Minute</key>
-            <integer>${minute}</integer>
-        </dict>
-    </array>
-    <key>StandardOutPath</key>
-    <string>${PROJECT_ROOT}/logs/${task_name}.log</string>
-    <key>StandardErrorPath</key>
-    <string>${PROJECT_ROOT}/logs/${task_name}.error.log</string>
-    <key>WorkingDirectory</key>
-    <string>${PROJECT_ROOT}</string>
-    <key>EnvironmentVariables</key>
-    <dict>
-        <key>PATH</key>
-        <string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
-        <key>HOME</key>
-        <string>${HOME}</string>
-        <key>PYTHONPATH</key>
-        <string>${PROJECT_ROOT}</string>
-    </dict>
-</dict>
-</plist>
+    # 模拟北京时间周一至周五
+    for d in range(5):
+        dt_bj = datetime(2026, 8, 24 + d, bj_h, bj_m, tzinfo=tz_cst)
+        dt_local = dt_bj.astimezone(tz_local)
+        w = int(dt_local.strftime("%w"))
+        h = dt_local.hour
+        m = dt_local.minute
+        calendar_intervals.append({
+            "Weekday": w,
+            "Hour": h,
+            "Minute": m
+        })
+        w_name = weekday_names[w]
+        if w_name not in local_days_list:
+            local_days_list.append(w_name)
+        local_time_str = f"{h:02d}:{m:02d}"
+        
+    plist_data = {
+        "Label": task_name,
+        "ProgramArguments": ["/bin/bash", RUN_ALL_SCRIPT],
+        "StartCalendarInterval": calendar_intervals,
+        "StandardOutPath": f"{PROJECT_ROOT}/logs/{task_name}.log",
+        "StandardErrorPath": f"{PROJECT_ROOT}/logs/{task_name}.error.log",
+        "WorkingDirectory": PROJECT_ROOT,
+        "EnvironmentVariables": {
+            "PATH": "/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin",
+            "HOME": os.path.expanduser("~"),
+            "PYTHONPATH": PROJECT_ROOT
+        }
+    }
+    
+    plist_path = os.path.join(LAUNCH_AGENTS_DIR, f"{task_name}.plist")
+    with open(plist_path, "wb") as f:
+        plistlib.dump(plist_data, f)
+        
+    print(f"【{desc}】")
+    print(f"  对齐北京时间: 周一至周五 {bj_h:02d}:{bj_m:02d}")
+    print(f"  换算本地时间: {'、'.join(local_days_list)} {local_time_str} ({tz_name})")
+    print(f"  配置已写入: {plist_path}")
+    print("-" * 50)
 EOF
-    echo "$plist_file"
-}
 
-# 函数：加载任务
-load_task() {
+# 函数：重新加载 launchd 任务
+load_launchd_task() {
     local task_name=$1
     local plist_file="${LAUNCH_AGENTS_DIR}/${task_name}.plist"
     
-    # 卸载已存在的任务
+    # 先卸载旧任务
     launchctl unload "$plist_file" 2>/dev/null
+    launchctl bootout gui/"$(id -u)" "$plist_file" 2>/dev/null
     
-    # 加载新任务
-    if launchctl load "$plist_file" 2>/dev/null; then
-        echo -e "${GREEN}✅ 任务 ${task_name} 创建成功！${NC}"
-        return 0
+    # 尝试加载新任务
+    if launchctl load "$plist_file" 2>/dev/null || launchctl bootstrap gui/"$(id -u)" "$plist_file" 2>/dev/null; then
+        echo -e "${GREEN}✅ 任务 ${task_name} 已成功注册到系统！${NC}"
     else
-        # 尝试使用新的 launchctl 语法 (macOS 10.10+)
-        if launchctl bootstrap gui/"$(id -u)" "$plist_file" 2>/dev/null; then
-            echo -e "${GREEN}✅ 任务 ${task_name} 创建成功！${NC}"
-            return 0
-        else
-            echo -e "${RED}❌ 任务 ${task_name} 创建失败！${NC}"
-            return 1
-        fi
+        echo -e "${RED}❌ 任务 ${task_name} 注册失败，请检查权限。${NC}"
     fi
 }
 
-echo "正在设置计划任务..."
-echo "脚本路径: $RUN_ALL_SCRIPT"
-echo "日志文件: $LOG_FILE"
 echo ""
+echo "正在重新注册 launchd 定时任务..."
+load_launchd_task "$TASK_NAME_1"
+load_launchd_task "$TASK_NAME_2"
 
-# 删除已存在的同名任务
-echo "检查并删除已存在的同名任务..."
-launchctl unload "${LAUNCH_AGENTS_DIR}/${TASK_NAME_1}.plist" 2>/dev/null
-launchctl unload "${LAUNCH_AGENTS_DIR}/${TASK_NAME_2}.plist" 2>/dev/null
-launchctl bootout gui/"$(id -u)" "${LAUNCH_AGENTS_DIR}/${TASK_NAME_1}.plist" 2>/dev/null
-launchctl bootout gui/"$(id -u)" "${LAUNCH_AGENTS_DIR}/${TASK_NAME_2}.plist" 2>/dev/null
-
-# ===== 创建第一个任务 (9 35) =====
-echo ""
-echo "创建任务 1: ${TASK_NAME_1} (${LOCAL_TIME_1})..."
-PLIST_1=$(create_plist "$TASK_NAME_1" 9 35)
-load_task "$TASK_NAME_1"
-
-# ===== 创建第二个任务 (14 20) =====
-echo ""
-echo "创建任务 2: ${TASK_NAME_2} (${LOCAL_TIME_2})..."
-PLIST_2=$(create_plist "$TASK_NAME_2" 14 20)
-load_task "$TASK_NAME_2"
-
-# 显示任务详情
 echo ""
 echo "========================================"
-echo "任务创建完成！"
+echo -e "${GREEN}🎉 定时任务设置完成！${NC}"
 echo "========================================"
+echo "当前托管中的任务列表："
+launchctl list | grep "com.gupiao"
 echo ""
-echo -e "${GREEN}任务 1 详情:${NC}"
-echo "  名称: ${TASK_NAME_1}"
-echo "  时间: 每天 ${LOCAL_TIME_1}"
-echo "  配置: ${PLIST_1}"
+echo "查看运行日志："
+echo "  tail -f ${LOG_FILE}"
 echo ""
-echo -e "${GREEN}任务 2 详情:${NC}"
-echo "  名称: ${TASK_NAME_2}"
-echo "  时间: 每天 ${LOCAL_TIME_2}"
-echo "  配置: ${PLIST_2}"
-echo ""
-echo "日志将保存到:"
-echo "  - ${PROJECT_ROOT}/logs/${TASK_NAME_1}.log"
-echo "  - ${PROJECT_ROOT}/logs/${TASK_NAME_2}.log"
-echo "  - ${PROJECT_ROOT}/logs/${TASK_NAME_1}.error.log"
-echo "  - ${PROJECT_ROOT}/logs/${TASK_NAME_2}.error.log"
-echo "  - ${LOG_FILE}"
-echo ""
-echo "提示: 你可以通过以下命令查看任务状态:"
-echo "  launchctl list | grep com.gupiao"
-echo ""
-echo "手动触发任务:"
-echo "  launchctl start ${TASK_NAME_1}"
-echo "  launchctl start ${TASK_NAME_2}"
-echo ""
-echo "删除任务:"
-echo "  bash remove_task.sh"
-echo ""
-echo "按回车键退出..."
-read -r
