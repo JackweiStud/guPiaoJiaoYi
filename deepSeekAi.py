@@ -16,11 +16,30 @@ from pathlib import Path
 from typing import Optional, Dict, Any
 import httpx
 from pydantic import BaseModel, Field
-from tenacity import retry, stop_after_attempt, wait_exponential
+from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception
 from dotenv import load_dotenv
 
 # 加载环境变量
 load_dotenv()
+
+
+def _is_retryable_exception(exc: BaseException) -> bool:
+    """判断是否为需要重试的网络/超时/服务端异常"""
+    if isinstance(exc, (httpx.TimeoutException, httpx.NetworkError, httpx.RequestError)):
+        return True
+    if isinstance(exc, httpx.HTTPStatusError):
+        # 429 (Too Many Requests) 或 5xx 服务端错误进行重试
+        return exc.response.status_code == 429 or exc.response.status_code >= 500
+    return False
+
+
+def _log_retry_attempt(retry_state):
+    exc = retry_state.outcome.exception()
+    attempt = retry_state.attempt_number
+    sleep_time = retry_state.next_action.sleep if retry_state.next_action else 0
+    exc_name = type(exc).__name__
+    print(f"[DeepSeek API] 第 {attempt} 次调用异常 ({exc_name}: {exc})，将在 {sleep_time:.1f} 秒后进行重试 (尝试 {attempt + 1}/3)...")
+
 
 class DeepSeekConfig(BaseModel):
     """深度求索API配置"""
@@ -68,7 +87,7 @@ class DeepSeekAnalyzer:
         self.client = httpx.Client(
             timeout=httpx.Timeout(
                 connect=10.0,      # 连接超时：10秒
-                read=400.0,        # 读取超时：300秒
+                read=400.0,        # 读取超时：400秒
                 write=30.0,        # 写入超时：30秒
                 pool=60.0          # 连接池超时：60秒
             ),
@@ -80,11 +99,23 @@ class DeepSeekAnalyzer:
         )
 
     @retry(
-        stop=stop_after_attempt(2),  # 增加到3次重试
-        wait=wait_exponential(multiplier=2, min=4, max=30),  # 指数退避：4-30秒
+        retry=retry_if_exception(_is_retryable_exception),
+        stop=stop_after_attempt(3),  # 首次调用 + 最多重试2次 (共3次)
+        wait=wait_exponential(multiplier=2, min=3, max=20),
+        before_sleep=_log_retry_attempt,
         reraise=True
     )
-    def analyze_data(self, df: pd.DataFrame, user_prompt: str) -> Dict[str, str]:
+    def _send_request(self, payload: dict) -> dict:
+        """发送请求到 API 端点，由 @retry 拦截网络/超时/5xx/429 异常并自动重试"""
+        response = self.client.post(
+            f"{self.config.base_url}/chat/completions",
+            headers={"Authorization": f"Bearer {self.config.api_key}"},
+            json=payload
+        )
+        response.raise_for_status()
+        return response.json()
+
+    def analyze_data(self, df: pd.DataFrame, user_prompt: str) -> Dict[str, Any]:
         """
         同步版本的数据分析方法
         :return: 包含内容和推理内容的字典
@@ -98,52 +129,49 @@ class DeepSeekAnalyzer:
             print(f"样本数据(仅展示最新5条)：\n{df.tail(5).to_markdown()}")
             
             print("------------process_response 开始--------------------")
-            print(f"开始调用DeepSeek API，超时设置：连接10s，读取300s")
+            print(f"开始调用DeepSeek API，超时设置：连接10s，读取400s（支持异常自动重试 1~2 次）")
 
-            response = self.client.post(
-                f"{self.config.base_url}/chat/completions",
-                headers={"Authorization": f"Bearer {self.config.api_key}"},
-                json={
-                    "messages": [
-                        {"role": "system", "content": self.config.system_prompt},
-                        {"role": "user", "content": f"{user_prompt}\n{data_summary}\n样本数据：\n{data_str}"}
-                    ],
-                    "model": self.config.model,
-                    "max_tokens": self.config.max_tokens,
-                    "temperature": self.config.temperature,
-                    "top_p": self.config.top_p,
-                    "stream": False,
-                    "response_format": {"type": "text"},
-                    "stop": ["</分析结束>"]
-                }
-            )
-            response.raise_for_status()
+            payload = {
+                "messages": [
+                    {"role": "system", "content": self.config.system_prompt},
+                    {"role": "user", "content": f"{user_prompt}\n{data_summary}\n样本数据：\n{data_str}"}
+                ],
+                "model": self.config.model,
+                "max_tokens": self.config.max_tokens,
+                "temperature": self.config.temperature,
+                "top_p": self.config.top_p,
+                "stream": False,
+                "response_format": {"type": "text"},
+                "stop": ["</分析结束>"]
+            }
 
-            response_data = response.json()
+            response_data = self._send_request(payload)
             print("API调用成功，开始处理响应...")
 
             temp = self._process_response(response_data)
             print("------------_process_response 完成--------------------")
-
             return temp
 
         except httpx.ConnectTimeout:
-            print("连接超时：无法连接到DeepSeek API服务器")
-            return {"content": "连接超时：无法连接到API服务器，请检查网络连接", "reasoning_content": "网络连接问题", "is_complete": False}
+            print("[DeepSeek API] 连接超时：无法连接到API服务器（已耗尽重试次数）")
+            return {"content": "连接超时：无法连接到API服务器，请检查网络连接", "reasoning_content": "网络连接超时", "is_complete": False}
         except httpx.ReadTimeout:
-            print("读取超时：API响应时间过长")
+            print("[DeepSeek API] 读取超时：API响应时间过长（已耗尽重试次数）")
             return {"content": "读取超时：API响应时间过长，建议简化请求内容", "reasoning_content": "响应超时", "is_complete": False}
         except httpx.HTTPStatusError as e:
-            print(f"HTTP状态错误：{e.response.status_code} - {e.response.text}")
+            print(f"[DeepSeek API] HTTP状态错误：{e.response.status_code} - {e.response.text}")
             return {"content": f"API请求失败: {e.response.status_code} {e.response.text}", "reasoning_content": "HTTP错误", "is_complete": False}
         except httpx.RequestError as e:
-            print(f"请求错误：{str(e)}")
+            print(f"[DeepSeek API] 网络请求错误：{str(e)}（已耗尽重试次数）")
             return {"content": f"网络请求错误: {str(e)}", "reasoning_content": "网络问题", "is_complete": False}
         except Exception as e:
-            print(f"未知错误：{str(e)}")
+            print(f"[DeepSeek API] 未知错误：{str(e)}")
             return {"content": f"分析失败: {str(e)}", "reasoning_content": "系统错误", "is_complete": False}
         finally:
-            self.client.close()
+            try:
+                self.client.close()
+            except Exception:
+                pass
 
     def _process_response(self, response_data: dict) -> dict:
         """改进响应处理"""
