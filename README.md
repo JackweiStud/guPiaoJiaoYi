@@ -1,9 +1,27 @@
 # guPiaoJiaoYi - AI和量化投资探索
 
+> 🌟 **NextGen 升级**：已上线基于 **RSRS 阻力支撑相对强度**、**KAMA 自适应均线**、**宏观流动性状态机** 与 **多资产截面动量轮动 (2021-2026 回测 +106.26% vs 基准 -2.31%)** 的下一代量化体系。  
+> 📖 详细指南请参阅：[README_下一代量化体系与操作指南.md](readmeMd/README_下一代量化体系与操作指南.md) 与 [系统诊断与演进方案](doc/ETF量化策略系统性诊断与演进方案.md)。
+
 ## 🚀 快速开始
 
+### 常用命令 (NextGen CLI)
+```bash
+# 1. 每日全市场截面动量轮动榜单与 Top 2 推荐
+python etf_rotation.py
+
+# 2. 多资产轮动历史全样本回测
+python etf_rotation.py --backtest
+
+# 3. 单标的低滞后信号与 ATR 动态止损位
+python run.py nextgen --codes 159843,512820
+
+# 4. 新旧策略横向对比回测
+python etf_rotation.py --compare
+```
+
 ### 环境要求
-- Python 3.14+
+- Python 3.10+
 - 推荐使用虚拟环境
 
 ### 安装步骤
