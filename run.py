@@ -43,7 +43,9 @@ from dotenv import load_dotenv
 load_dotenv()
 from datetime import datetime
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Optional, Tuple, Any
+import pandas as pd
+import numpy as np
 
 
 PROJECT_ROOT = Path(__file__).resolve().parent
@@ -167,34 +169,90 @@ def run_auto(codes: List[str], send_email: bool) -> List[Dict[str, str]]:
                 results.append({"code": code, "status": "ok"})
         except Exception as exc:
             results.append({"code": code, "status": f"error: {exc}"})
+def run_rotation() -> Dict[str, Any]:
+    from etf_rotation import run_daily_rotation_summary
+    return run_daily_rotation_summary()
+
+
+def run_nextgen_signals(codes: List[str], fetch_first: bool) -> List[Dict[str, Any]]:
+    from sdd import load_etf_data
+    from quant.factors.rsrs import calc_rsrs
+    from quant.factors.kama import calc_kama
+    from quant.factors.volatility import calc_atr
+
+    if fetch_first:
+        run_fetch(codes)
+
+    results: List[Dict[str, Any]] = []
+    for code in codes:
+        clean_code = code.split(".")[0]
+        csv_path = PROJECT_ROOT / "stock_data" / clean_code / f"{clean_code}_Day.csv"
+        if not csv_path.exists():
+            csv_path = PROJECT_ROOT / "stock_data" / f"{clean_code}_Day.csv"
+        if not csv_path.exists():
+            results.append({"code": code, "status": "error", "reason": "data file not found"})
+            continue
+        try:
+            df = load_etf_data(str(csv_path))
+            rsrs_res = calc_rsrs(df)
+            close = df["CloseValue"].astype(float)
+            kama_series = calc_kama(close)
+            atr_series = calc_atr(df)
+
+            last_close = float(close.iloc[-1])
+            last_kama = float(kama_series.iloc[-1]) if not pd.isna(kama_series.iloc[-1]) else last_close
+            last_atr = float(atr_series.iloc[-1]) if not pd.isna(atr_series.iloc[-1]) else last_close * 0.02
+
+            is_rsrs_buy = rsrs_res["score"] > 0.7
+            is_kama_bull = last_close >= last_kama * 0.995
+            is_rsrs_sell = rsrs_res["score"] < -0.7
+
+            if is_rsrs_buy and is_kama_bull:
+                sig_text = "买入"
+                sig_reason = f"RSRS强力看多(Score={rsrs_res['score']:.2f}) 且 价格处于KAMA自适应均线上方({last_close:.3f} >= {last_kama:.3f})"
+            elif is_rsrs_sell or last_close < last_kama * 0.97:
+                sig_text = "卖出"
+                sig_reason = f"RSRS遇阻回落(Score={rsrs_res['score']:.2f}) 或 跌破KAMA自适应均线({last_close:.3f} < {last_kama:.3f})"
+            else:
+                sig_text = "持有/观望"
+                sig_reason = f"RSRS中性({rsrs_res['score']:.2f}), KAMA={last_kama:.3f}, ATR={last_atr:.3f}"
+
+            suggested_stop = last_close - 2.5 * last_atr
+
+            results.append({
+                "code": code,
+                "signal": sig_text,
+                "reason": sig_reason,
+                "rsrs_score": rsrs_res["score"],
+                "kama": round(last_kama, 3),
+                "atr": round(last_atr, 3),
+                "suggested_trailing_stop": round(suggested_stop, 3)
+            })
+        except Exception as e:
+            results.append({"code": code, "status": "error", "reason": str(e)})
+
     return results
 
 
-def run_report(no_ai: bool, no_mail: bool) -> Dict[str, str]:
-    from webhtml.config import settings
-    from webhtml.reporter.generator import render_report, save_report, backup_raw_data
-    from webhtml.data_handler.fetcher import fetch_all_data
-    from webhtml.analysis.calculator import build_report_view
-    from webhtml.analysis.ai_summary import generate_ai_summary
+def run_compare(codes: List[str]) -> List[Dict[str, Any]]:
+    from sdd import load_etf_data
+    from quant.backtest.single_asset import compare_strategies_single_asset
 
-    if no_ai:
-        settings.USE_DEEPSEEK = 0
-    if no_mail:
-        settings.SEND_MAIL = 0
-
-    raw = fetch_all_data()
-    view = build_report_view(raw)
-    view["ai_summary"] = generate_ai_summary(view)
-
-    backup_raw_data(view.get("_raw", {}))
-    html = render_report(view)
-    output_path = save_report(html)
-
-    return {
-        "report_date": str(view.get("report_date") or ""),
-        "report_path": str(output_path),
-        "ai_summary": str(view.get("ai_summary") or ""),
-    }
+    results: List[Dict[str, Any]] = []
+    for code in codes:
+        clean_code = code.split(".")[0]
+        csv_path = PROJECT_ROOT / "stock_data" / clean_code / f"{clean_code}_Day.csv"
+        if not csv_path.exists():
+            csv_path = PROJECT_ROOT / "stock_data" / f"{clean_code}_Day.csv"
+        if not csv_path.exists():
+            continue
+        try:
+            df = load_etf_data(str(csv_path))
+            res = compare_strategies_single_asset(df, clean_code)
+            results.append(res)
+        except Exception as e:
+            results.append({"code": code, "error": str(e)})
+    return results
 
 
 def _emit_summary(payload: Dict, fmt: str, summary_file: Optional[str]) -> None:
@@ -214,6 +272,27 @@ def _emit_summary(payload: Dict, fmt: str, summary_file: Optional[str]) -> None:
             lines.append("signals:")
             for item in payload["signals"]:
                 lines.append(f"{item.get('code','')}: {item.get('signal','')} | {item.get('reason','')}")
+        if payload.get("nextgen_signals"):
+            lines.append("nextgen_signals:")
+            for item in payload["nextgen_signals"]:
+                lines.append(f"{item.get('code','')}: {item.get('signal','')} | {item.get('reason','')} | 建议移动止损位: {item.get('suggested_trailing_stop','')}")
+        if payload.get("rotation"):
+            rot = payload["rotation"]
+            decision = rot.get("decision", {})
+            lines.append(f"rotation_regime: {decision.get('regime','')}")
+            lines.append(f"rotation_decision: {decision.get('reason','')}")
+            if decision.get("selected_assets"):
+                lines.append("selected_assets:")
+                for a in decision["selected_assets"]:
+                    lines.append(f"  - {a.get('name')} ({a.get('symbol')}): 建议仓位 {int(a.get('weight',0.5)*100)}%")
+        if payload.get("compare"):
+            lines.append("compare_results:")
+            for item in payload["compare"]:
+                sym = item.get("symbol", "")
+                leg = item.get("legacy", {})
+                nxt = item.get("nextgen", {})
+                d = item.get("delta", {})
+                lines.append(f"  - {sym}: Legacy收益={leg.get('total_return',0)*100:+.1f}%, NextGen收益={nxt.get('total_return',0)*100:+.1f}%, 收益差={d.get('total_return',0)*100:+.1f}%, 回撤优化={d.get('max_drawdown_reduction',0)*100:+.1f}%, 夏普提升={d.get('sharpe_improvement',0):+.2f}")
         if payload.get("auto"):
             lines.append("auto:")
             for item in payload["auto"]:
@@ -233,7 +312,7 @@ def main() -> int:
         "mode",
         nargs="?",
         default="all",
-        choices=["all", "report", "signal", "fetch", "auto"],
+        choices=["all", "report", "signal", "fetch", "auto", "rotation", "nextgen", "compare"],
         help="Task mode to run",
     )
     parser.add_argument("--codes", help="Comma-separated codes, e.g. 159843,512820.SH")
@@ -250,7 +329,6 @@ def main() -> int:
     payload: Dict = {
         "generated_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
         "mode": args.mode,
-        # Always echo the exact invocation for automation/audit (OpenClaw/TG).
         "invocation": {
             "python": sys.executable,
             "cwd": os.getcwd(),
@@ -264,7 +342,7 @@ def main() -> int:
         return 0
 
     codes = _parse_codes(args.codes)
-    if not codes and args.mode in ("signal", "fetch", "auto", "all"):
+    if not codes and args.mode in ("signal", "fetch", "auto", "all", "nextgen", "compare"):
         codes = _default_codes_for_mode("auto" if args.mode == "auto" else "signal")
 
     if args.mode in ("report", "all"):
@@ -278,6 +356,15 @@ def main() -> int:
 
     if args.mode == "auto":
         payload["auto"] = run_auto(codes, send_email=not args.no_mail_auto)
+
+    if args.mode in ("rotation", "all"):
+        payload["rotation"] = run_rotation()
+
+    if args.mode == "nextgen":
+        payload["nextgen_signals"] = run_nextgen_signals(codes, fetch_first=not args.no_fetch)
+
+    if args.mode == "compare":
+        payload["compare"] = run_compare(codes)
 
     _emit_summary(payload, fmt=args.format, summary_file=args.summary_file)
     return 0

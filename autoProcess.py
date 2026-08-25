@@ -97,6 +97,24 @@ def build_signal_reason(etf_data, params):
         f"量比={_format_float(last_volume / last_volume_mavg if last_volume_mavg else None)}"
     ]
 
+    # 融入下一代低滞后指标与动态移动止损参考
+    try:
+        from quant.factors.rsrs import calc_rsrs
+        from quant.factors.kama import calc_kama
+        from quant.factors.volatility import calc_atr
+
+        rsrs_info = calc_rsrs(etf_data)
+        kama_val = float(calc_kama(close).iloc[-1])
+        atr_val = float(calc_atr(etf_data).iloc[-1])
+        suggested_stop = last_close - 2.5 * atr_val
+
+        parts.append(f"RSRS={_format_float(rsrs_info.get('score', 0.0))}")
+        parts.append(f"KAMA={_format_float(kama_val)}")
+        parts.append(f"ATR={_format_float(atr_val)}")
+        parts.append(f"建议ATR动态止损位={_format_float(suggested_stop)}")
+    except Exception:
+        pass
+
     triggers = []
     if ma_buy_condition:
         triggers.append("均线短期上穿且放量确认")
@@ -283,6 +301,18 @@ def get_trading_signal(stock_code):
             endTime=get_beijing_time().strftime('%Y-%m-%d'),
             plot_results=1,  # 需要设置为True以生成图片
             verbose=False,
+            # 其他回测参数，保持与 testOnlyNew 一致
+            initial_capital=100000.0, 
+            commission=0.0003, 
+            max_portfolio_allocation_pct=1,
+            buy_increment_pct_of_initial_capital=1, 
+            sell_decrement_pct_of_current_shares=1,
+            min_shares_per_trade=100,
+            # 设置时间范围，确保包含今天
+            statTime = statTime, 
+            endTime=get_beijing_time().strftime('%Y-%m-%d'),
+            plot_results=1,  # 需要设置为True以生成图片
+            verbose=False,
             enable_file_io=True
         )
 
@@ -323,6 +353,17 @@ def notify_by_email(stock_code, signal_text, signal_reason=None, aiDataInfo = No
     """
     根据信号发送邮件，增加5次重试逻辑。
     """
+    macro_section = ""
+    try:
+        from quant.regime.macro_regime import get_current_macro_regime
+        macro_info = get_current_macro_regime()
+        macro_section = (
+            f"【宏观流动性闸门】: {macro_info.get('label', '中性')} (建议总仓位上限: {int(macro_info.get('max_position_cap', 1.0) * 100)}%)\n"
+            f"说明: {macro_info.get('description', '')}\n"
+        )
+    except Exception:
+        pass
+
     subject = f"交易信号提醒: {stock_code} - {signal_text}"
     body = f"""
             你好，
@@ -334,29 +375,31 @@ def notify_by_email(stock_code, signal_text, signal_reason=None, aiDataInfo = No
             交易信号: {signal_text}
             {signal_reason or "信号来源说明：暂无"}
 
-            AI趋势策略：\n
-            {strategyinfo}
+            {macro_section}
+            AI趋势策略：
+            {strategyinfo or "暂无"}
 
-            详细AI趋势分析：\n
-            {aiDataInfo}
+            详细AI趋势分析：
+            {aiDataInfo or "暂无"}
 
             请查看附件图片获取详细图表。
 
             祝好，
             交易机器人
             """
-    
+
     image_paths = []
-    # 无条件附上图片
     symbol = stock_code.split('.')[0]
     image_folder = os.path.join(project_root, 'pic')
     print(f"图片文件夹路径为: {image_folder}")
-    required_images = [f'{symbol}_expectSignal.png', 
-                       f'{symbol}_Strategy_Performance_Dashboard.png',
-                       f'{symbol}_temp_strategy.csv', 
-                       f'{symbol}_divergence_ratio.csv', 
-                       f'{symbol}_BuyAndSell.csv']
-    
+    required_images = [
+        f'{symbol}_expectSignal.png',
+        f'{symbol}_Strategy_Performance_Dashboard.png',
+        f'{symbol}_temp_strategy.csv',
+        f'{symbol}_divergence_ratio.csv',
+        f'{symbol}_BuyAndSell.csv'
+    ]
+
     for img_name in required_images:
         path = os.path.join(image_folder, img_name)
         if os.path.exists(path):
@@ -389,8 +432,9 @@ def notify_by_email(stock_code, signal_text, signal_reason=None, aiDataInfo = No
         if attempt < max_retries - 1:
             print(f"将在 {delay_seconds} 秒后重试...")
             time.sleep(delay_seconds)
-    
+
     print("错误：邮件发送失败，已达到最大重试次数。请检查 emailFile/mailFun.py 的输出日志。")
+
 
 def notify_error(subject, body):
     """
@@ -419,22 +463,15 @@ def notify_error(subject, body):
         if attempt < max_retries - 1:
             print(f"将在 {delay_seconds} 秒后重试...")
             time.sleep(delay_seconds)
-    
+
     print("错误：发送错误报告邮件失败，已达到最大重试次数。")
+
 
 def autoProcessETF(target_stock_code):
     # 要监控的ETF代码
-    #target_stock_code = "58818 .SH"
     run_trading_strategy(target_stock_code)
 
-if __name__ == "__main__":
-   
-    #autoProcessETF("511090.SH") ##国债
-    #autoProcessETF("161128.SH") ##美股
-    #autoProcessETF("513160.SH") ##ganggu30
-    autoProcessETF("159843.SH") ##消费
-    #autoProcessETF("588180.SH") #科创50
-    #autoProcessETF("159915.SH") ##创业
-    autoProcessETF("512820.SH") ##银行
-    
 
+if __name__ == "__main__":
+    autoProcessETF("159843.SH")
+    autoProcessETF("512820.SH")
