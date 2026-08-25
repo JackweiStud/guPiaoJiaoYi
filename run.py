@@ -169,6 +169,36 @@ def run_auto(codes: List[str], send_email: bool) -> List[Dict[str, str]]:
                 results.append({"code": code, "status": "ok"})
         except Exception as exc:
             results.append({"code": code, "status": f"error: {exc}"})
+    return results
+
+
+def run_report(no_ai: bool, no_mail: bool) -> Dict[str, str]:
+    from webhtml.config import settings
+    from webhtml.reporter.generator import render_report, save_report, backup_raw_data
+    from webhtml.data_handler.fetcher import fetch_all_data
+    from webhtml.analysis.calculator import build_report_view
+    from webhtml.analysis.ai_summary import generate_ai_summary
+
+    if no_ai:
+        settings.USE_DEEPSEEK = 0
+    if no_mail:
+        settings.SEND_MAIL = 0
+
+    raw = fetch_all_data()
+    view = build_report_view(raw)
+    view["ai_summary"] = generate_ai_summary(view)
+
+    backup_raw_data(view.get("_raw", {}))
+    html = render_report(view)
+    output_path = save_report(html)
+
+    return {
+        "report_date": str(view.get("report_date") or ""),
+        "report_path": str(output_path),
+        "ai_summary": str(view.get("ai_summary") or ""),
+    }
+
+
 def run_rotation() -> Dict[str, Any]:
     from etf_rotation import run_daily_rotation_summary
     return run_daily_rotation_summary()
