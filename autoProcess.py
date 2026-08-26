@@ -301,18 +301,6 @@ def get_trading_signal(stock_code):
             endTime=get_beijing_time().strftime('%Y-%m-%d'),
             plot_results=1,  # 需要设置为True以生成图片
             verbose=False,
-            # 其他回测参数，保持与 testOnlyNew 一致
-            initial_capital=100000.0, 
-            commission=0.0003, 
-            max_portfolio_allocation_pct=1,
-            buy_increment_pct_of_initial_capital=1, 
-            sell_decrement_pct_of_current_shares=1,
-            min_shares_per_trade=100,
-            # 设置时间范围，确保包含今天
-            statTime = statTime, 
-            endTime=get_beijing_time().strftime('%Y-%m-%d'),
-            plot_results=1,  # 需要设置为True以生成图片
-            verbose=False,
             enable_file_io=True
         )
 
