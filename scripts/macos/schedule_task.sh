@@ -23,6 +23,10 @@ LOG_FILE="${PROJECT_ROOT}/logs/auto_run.log"
 VENV_PYTHON="${PROJECT_ROOT}/venv/bin/python"
 LAUNCH_AGENTS_DIR="${HOME}/Library/LaunchAgents"
 
+export PROJECT_ROOT
+export LAUNCH_AGENTS_DIR
+export RUN_ALL_SCRIPT
+
 # 确保日志目录存在
 mkdir -p "${PROJECT_ROOT}/logs"
 mkdir -p "$LAUNCH_AGENTS_DIR"
