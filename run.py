@@ -175,6 +175,7 @@ def run_auto(codes: List[str], send_email: bool) -> List[Dict[str, str]]:
 def run_report(no_ai: bool, no_mail: bool) -> Dict[str, str]:
     from webhtml.config import settings
     from webhtml.reporter.generator import render_report, save_report, backup_raw_data
+    from webhtml.reporter.mailer import send_report_mail
     from webhtml.data_handler.fetcher import fetch_all_data
     from webhtml.analysis.calculator import build_report_view
     from webhtml.analysis.ai_summary import generate_ai_summary
@@ -192,10 +193,25 @@ def run_report(no_ai: bool, no_mail: bool) -> Dict[str, str]:
     html = render_report(view)
     output_path = save_report(html)
 
+    mail_status = "disabled"
+    if settings.SEND_MAIL:
+        current_time = datetime.now().strftime("%H:%M")
+        subject = f"{current_time} 金融行情早晚报"
+        body = (
+            "尊敬的客户您好，我是淮州金融科技小艾：\n\n"
+            f"已为您生成 {view.get('report_date')} 全球金融行情监控报告\n\n"
+            f"中国大陆市场一句话总结：\n{view.get('ai_summary', '暂无总结')}\n\n"
+            "详细请查看附件HTML文件获取详细图表。\n\n"
+            "(本邮件由系统自动发送)"
+        )
+        ok = send_report_mail(subject=subject, body=body, html_path=output_path)
+        mail_status = "ok" if ok else "failed"
+
     return {
         "report_date": str(view.get("report_date") or ""),
         "report_path": str(output_path),
         "ai_summary": str(view.get("ai_summary") or ""),
+        "mail_status": mail_status,
     }
 
 
@@ -298,6 +314,8 @@ def _emit_summary(payload: Dict, fmt: str, summary_file: Optional[str]) -> None:
             lines.append(f"report_date: {report.get('report_date','')}")
             lines.append(f"report_path: {report.get('report_path','')}")
             lines.append(f"ai_summary: {report.get('ai_summary','')}")
+            if report.get("mail_status"):
+                lines.append(f"mail_status: {report.get('mail_status','')}")
         if payload.get("signals"):
             lines.append("signals:")
             for item in payload["signals"]:

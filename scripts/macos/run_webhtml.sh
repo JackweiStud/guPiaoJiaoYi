@@ -13,7 +13,7 @@ VENV_DIR="${PROJECT_ROOT}/venv"
 mkdir -p "${PROJECT_ROOT}/logs"
 
 # 记录开始时间
-echo "[$(date '+%Y-%m-%d %H:%M:%S')] 开始执行 webhtml/main.py" > "$LOG_FILE"
+echo "[$(date '+%Y-%m-%d %H:%M:%S')] 开始执行 webhtml/main.py" >> "$LOG_FILE"
 
 # 切换到项目根目录
 cd "$PROJECT_ROOT" || exit 1
