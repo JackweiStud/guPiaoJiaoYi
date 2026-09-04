@@ -2,8 +2,7 @@
 # schedule_task.sh - MacOS版本
 # 设置定时任务（使用 launchd）
 # 自动识别系统本地时区并精准换算对齐【北京时间】A股交易时段：
-# - 任务 1: 北京时间 09:35:00 (开盘信号与分析)
-# - 任务 2: 北京时间 14:20:00 (尾盘信号与总结)
+# - 任务: 北京时间 14:20:00 (尾盘信号与总结)
 
 # 颜色定义
 RED='\033[0;31m'
@@ -16,8 +15,8 @@ NC='\033[0m' # No Color
 # 设置变量
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PROJECT_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
-TASK_NAME_1="com.gupiao.autoprocess.0935"
-TASK_NAME_2="com.gupiao.autoprocess.1420"
+TASK_NAME="com.gupiao.autoprocess.1420"
+OLD_TASK_NAME="com.gupiao.autoprocess.0935"
 RUN_ALL_SCRIPT="${SCRIPT_DIR}/run_all_tasks.sh"
 LOG_FILE="${PROJECT_ROOT}/logs/auto_run.log"
 VENV_PYTHON="${PROJECT_ROOT}/venv/bin/python"
@@ -42,7 +41,6 @@ echo "========================================"
 echo "MacOS 自动任务计划设置工具 (时区自适应)"
 echo "========================================"
 echo "目标 A 股交易时段 (北京时间 CST, UTC+8):"
-echo "  - 开盘任务: 周一至周五 09:35"
 echo "  - 尾盘任务: 周一至周五 14:20"
 echo ""
 
@@ -77,7 +75,6 @@ tz_name = now_local.strftime("%Z")
 utc_offset = now_local.strftime("%z")
 
 tasks = [
-    ("com.gupiao.autoprocess.0935", 9, 35, "开盘任务 (北京时间 09:35)"),
     ("com.gupiao.autoprocess.1420", 14, 20, "尾盘任务 (北京时间 14:20)")
 ]
 
@@ -150,10 +147,21 @@ load_launchd_task() {
     fi
 }
 
+# 彻底清理已取消的开盘旧任务
+if [ -n "$OLD_TASK_NAME" ]; then
+    OLD_PLIST="${LAUNCH_AGENTS_DIR}/${OLD_TASK_NAME}.plist"
+    if [ -f "$OLD_PLIST" ] || launchctl list | grep -q "$OLD_TASK_NAME"; then
+        echo -e "${YELLOW}正在清理已取消的任务 ${OLD_TASK_NAME}...${NC}"
+        launchctl unload "$OLD_PLIST" 2>/dev/null
+        launchctl bootout gui/"$(id -u)" "$OLD_PLIST" 2>/dev/null
+        rm -f "$OLD_PLIST"
+        echo -e "${GREEN}✅ 已取消并移除旧任务 ${OLD_TASK_NAME}${NC}"
+    fi
+fi
+
 echo ""
 echo "正在重新注册 launchd 定时任务..."
-load_launchd_task "$TASK_NAME_1"
-load_launchd_task "$TASK_NAME_2"
+load_launchd_task "$TASK_NAME"
 
 echo ""
 echo "========================================"
