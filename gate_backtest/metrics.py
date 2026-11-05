@@ -64,6 +64,7 @@ def summarize_equity(
     vol = annualized_vol(returns)
     pos = position.reindex(equity.index).fillna(0.0)
     hold_share = float((pos > 0).mean()) if len(pos) else 0.0
+    exposure_share = float(pos.mean()) if len(pos) else 0.0
     # 换手：持仓状态变化次数
     turns = int((pos.fillna(0).diff().abs() > 0).sum())
     return {
@@ -74,6 +75,7 @@ def summarize_equity(
         "calmar": calmar(ann, mdd),
         "n_turnovers": float(turns),
         "hold_day_share": hold_share,
+        "exposure_share": exposure_share,
     }
 
 

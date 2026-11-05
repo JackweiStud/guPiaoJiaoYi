@@ -227,8 +227,205 @@ def align_asof(
     return aligned, carry_days, max_streak
 
 
-def load_all(force_download: bool = True) -> DataBundle:
-    """下载全部真实数据并归档原样 CSV。"""
+def _load_fred_from_raw(series_id: str) -> Tuple[pd.Series, Optional[dict]]:
+    """从已归档原样 CSV 读取 FRED 序列（不插值）。"""
+    raw_path = os.path.join(DATA_RAW, f"FRED_{series_id}.csv")
+    if not os.path.isfile(raw_path):
+        raise FileNotFoundError(raw_path)
+    df = pd.read_csv(raw_path)
+    date_col, val_col = df.columns[0], df.columns[1]
+    df[date_col] = pd.to_datetime(df[date_col])
+    df[val_col] = pd.to_numeric(df[val_col], errors="coerce")
+    valid = df.dropna(subset=[val_col]).copy()
+    series = valid.set_index(date_col)[val_col].sort_index()
+    series.index = pd.DatetimeIndex(series.index).tz_localize(None).normalize()
+    series = series[~series.index.duplicated(keep="last")].astype(float)
+    return series, None
+
+
+def _load_yahoo_from_raw(ticker: str) -> pd.DataFrame:
+    raw_path = os.path.join(DATA_RAW, f"YAHOO_{ticker}.csv")
+    if not os.path.isfile(raw_path):
+        raise FileNotFoundError(raw_path)
+    df = pd.read_csv(raw_path)
+    date_col = df.columns[0]
+    df[date_col] = pd.to_datetime(df[date_col])
+    df = df.set_index(date_col).sort_index()
+    df.index = pd.DatetimeIndex(df.index).tz_localize(None).normalize()
+    df = df[~df.index.duplicated(keep="last")]
+    return df
+
+
+def _load_fund_from_raw() -> pd.Series:
+    raw_path = os.path.join(DATA_RAW, "FUND_539002_nav.csv")
+    if not os.path.isfile(raw_path):
+        raise FileNotFoundError(raw_path)
+    df = pd.read_csv(raw_path)
+    date_col = "净值日期" if "净值日期" in df.columns else df.columns[0]
+    nav_col = "单位净值" if "单位净值" in df.columns else df.columns[1]
+    work = df[[date_col, nav_col]].copy()
+    work[date_col] = pd.to_datetime(work[date_col])
+    work[nav_col] = pd.to_numeric(work[nav_col], errors="coerce")
+    work = work.dropna()
+    series = work.set_index(date_col)[nav_col].sort_index()
+    series.index = pd.DatetimeIndex(series.index).tz_localize(None).normalize()
+    series = series[~series.index.duplicated(keep="last")].astype(float)
+    return series
+
+
+def load_from_raw() -> DataBundle:
+    """
+    复用已归档的原样 CSV（不重新下载）。元数据优先读 `_download_meta.json`。
+    用于 v2 在不改动 v1 数据文件的前提下复现；缺文件则报错。
+    """
+    _ensure_dirs()
+    bundle = DataBundle()
+    meta_path = os.path.join(DATA_RAW, "_download_meta.json")
+    meta_by_id: Dict[str, dict] = {}
+    if os.path.isfile(meta_path):
+        with open(meta_path, "r", encoding="utf-8") as f:
+            for m in json.load(f):
+                meta_by_id[m["series_id"]] = m
+
+    for sid, info in FRED_SERIES.items():
+        series, _ = _load_fred_from_raw(sid)
+        bundle.fred[sid] = series
+        if sid in meta_by_id:
+            md = meta_by_id[sid]
+            meta = SeriesMeta(
+                series_id=md["series_id"],
+                source_url=md["source_url"],
+                start_date=md["start_date"],
+                end_date=md["end_date"],
+                n_rows=int(md["n_rows"]),
+                missing_days=int(md["missing_days"]),
+                missing_calendar=md["missing_calendar"],
+                downloaded_at=md["downloaded_at"],
+                raw_path=md["raw_path"],
+                notes=md.get("notes", "") + "；load_from_raw 复用",
+                carry_forward_days=int(md.get("carry_forward_days", 0)),
+                max_carry_streak=int(md.get("max_carry_streak", 0)),
+            )
+        else:
+            start, end = series.index.min(), series.index.max()
+            missing = _weekday_missing(series.index, start, end)
+            meta = SeriesMeta(
+                series_id=sid,
+                source_url=FRED_CSV.format(sid=sid, cosd=info["cosd"], coed=""),
+                start_date=str(start.date()),
+                end_date=str(end.date()),
+                n_rows=int(len(series)),
+                missing_days=missing,
+                missing_calendar="工作日 bday（Mon–Fri，未剔除美国节假日；原 CSV 中非数值行已计为缺失）",
+                downloaded_at="(from raw)",
+                raw_path=os.path.relpath(os.path.join(DATA_RAW, f"FRED_{sid}.csv"), os.path.dirname(ROOT)),
+                notes=f"角色={info['role']}；load_from_raw",
+            )
+        bundle.meta.append(meta)
+        bundle.gaps[sid] = {
+            "missing_days": meta.missing_days,
+            "missing_calendar": meta.missing_calendar,
+            "start": meta.start_date,
+            "end": meta.end_date,
+            "n_rows": meta.n_rows,
+        }
+
+    for ticker in ("SOXX", "SMH"):
+        px = _load_yahoo_from_raw(ticker)
+        bundle.prices[ticker] = px
+        if ticker in meta_by_id:
+            md = meta_by_id[ticker]
+            meta = SeriesMeta(
+                series_id=md["series_id"],
+                source_url=md["source_url"],
+                start_date=md["start_date"],
+                end_date=md["end_date"],
+                n_rows=int(md["n_rows"]),
+                missing_days=int(md["missing_days"]),
+                missing_calendar=md["missing_calendar"],
+                downloaded_at=md["downloaded_at"],
+                raw_path=md["raw_path"],
+                notes=(md.get("notes", "") + "；load_from_raw 复用"),
+                carry_forward_days=int(md.get("carry_forward_days", 0)),
+                max_carry_streak=int(md.get("max_carry_streak", 0)),
+            )
+        else:
+            start_ts, end_ts = px.index.min(), px.index.max()
+            missing = _weekday_missing(px.index, start_ts, end_ts)
+            meta = SeriesMeta(
+                series_id=ticker,
+                source_url=f"https://finance.yahoo.com/quote/{ticker}/history",
+                start_date=str(start_ts.date()),
+                end_date=str(end_ts.date()),
+                n_rows=int(len(px)),
+                missing_days=missing,
+                missing_calendar="工作日 bday（相对 Yahoo 返回的起止；未剔除美股休市日，故为上界）",
+                downloaded_at="(from raw)",
+                raw_path=os.path.relpath(os.path.join(DATA_RAW, f"YAHOO_{ticker}.csv"), os.path.dirname(ROOT)),
+                notes="load_from_raw",
+            )
+        bundle.meta.append(meta)
+        bundle.gaps[ticker] = {
+            "missing_days": meta.missing_days,
+            "missing_calendar": meta.missing_calendar,
+            "start": meta.start_date,
+            "end": meta.end_date,
+            "n_rows": meta.n_rows,
+        }
+
+    try:
+        nav = _load_fund_from_raw()
+        bundle.fund_nav = nav
+        if "539002" in meta_by_id:
+            md = meta_by_id["539002"]
+            meta = SeriesMeta(
+                series_id=md["series_id"],
+                source_url=md["source_url"],
+                start_date=md["start_date"],
+                end_date=md["end_date"],
+                n_rows=int(md["n_rows"]),
+                missing_days=int(md["missing_days"]),
+                missing_calendar=md["missing_calendar"],
+                downloaded_at=md["downloaded_at"],
+                raw_path=md["raw_path"],
+                notes=(md.get("notes", "") + "；load_from_raw 复用"),
+                carry_forward_days=int(md.get("carry_forward_days", 0)),
+                max_carry_streak=int(md.get("max_carry_streak", 0)),
+            )
+        else:
+            start_ts, end_ts = nav.index.min(), nav.index.max()
+            missing = _weekday_missing(nav.index, start_ts, end_ts)
+            meta = SeriesMeta(
+                series_id="539002",
+                source_url="akshare / 东方财富基金净值",
+                start_date=str(start_ts.date()),
+                end_date=str(end_ts.date()),
+                n_rows=int(len(nav)),
+                missing_days=missing,
+                missing_calendar="工作日 bday（相对净值序列起止；中国法定节假日未剔除，故为上界）",
+                downloaded_at="(from raw)",
+                raw_path=os.path.relpath(os.path.join(DATA_RAW, "FUND_539002_nav.csv"), os.path.dirname(ROOT)),
+                notes="load_from_raw",
+            )
+        bundle.meta.append(meta)
+        bundle.gaps["539002"] = {
+            "missing_days": meta.missing_days,
+            "missing_calendar": meta.missing_calendar,
+            "start": meta.start_date,
+            "end": meta.end_date,
+            "n_rows": meta.n_rows,
+        }
+    except Exception as exc:  # noqa: BLE001
+        bundle.gaps["539002"] = {"error": str(exc), "missing": "全部不可用"}
+
+    return bundle
+
+
+def load_all(force_download: bool = True, prefer_raw: bool = False) -> DataBundle:
+    """下载全部真实数据并归档原样 CSV。prefer_raw=True 时优先复用 data_raw。"""
+    if prefer_raw and os.path.isfile(os.path.join(DATA_RAW, "FRED_DGS30.csv")):
+        return load_from_raw()
+
     _ensure_dirs()
     bundle = DataBundle()
     coed = datetime.now(timezone.utc).strftime("%Y-%m-%d")
@@ -283,8 +480,17 @@ def load_all(force_download: bool = True) -> DataBundle:
 def copy_raw_to_artifacts(artifacts_root: str = "/opt/cursor/artifacts/data_raw") -> List[str]:
     """复制 data_raw 到 artifacts。"""
     import shutil
+    import time
 
-    os.makedirs(artifacts_root, exist_ok=True)
+    for attempt in range(5):
+        try:
+            os.makedirs(artifacts_root, exist_ok=True)
+            break
+        except BlockingIOError:
+            time.sleep(0.5 * (attempt + 1))
+    else:
+        os.makedirs(artifacts_root, exist_ok=True)
+
     copied = []
     for name in sorted(os.listdir(DATA_RAW)):
         src = os.path.join(DATA_RAW, name)

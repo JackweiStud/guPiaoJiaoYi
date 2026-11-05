@@ -47,6 +47,15 @@ def credit_gate(baa10y: pd.Series, threshold: float) -> pd.Series:
     return (s <= threshold).astype(bool)
 
 
+def rate_absolute_gate(dgs30: pd.Series, threshold: float) -> pd.Series:
+    """
+    门 2（v2 绝对水平）：DGS30 ≤ threshold 时放行。
+    threshold 为开测前写死的 τ_rate（如 2007+ 中位数）。
+    """
+    s = dgs30.dropna().astype(float).sort_index()
+    return (s <= threshold).astype(bool)
+
+
 def oas_gate(oas: pd.Series, threshold: float = 3.6) -> pd.Series:
     """交叉检查：真实 HY OAS ≤ threshold。"""
     s = oas.dropna().astype(float).sort_index()
@@ -62,3 +71,14 @@ def combine_and_gates(*gates: pd.Series) -> pd.Series:
         aligned = pd.concat([out, g.astype(bool)], axis=1, join="inner")
         out = aligned.all(axis=1)
     return out.astype(bool)
+
+
+def count_open_gates(*gates: pd.Series) -> pd.Series:
+    """
+    在共同索引（inner join）上统计开了几道门。
+    注意：交易日历路径应先 asof 对齐再计数（见 backtest.build_*）。
+    """
+    if not gates:
+        raise ValueError("至少需要一个门")
+    df = pd.concat([g.astype(bool).astype(int) for g in gates], axis=1, join="inner")
+    return df.sum(axis=1).astype(int)
