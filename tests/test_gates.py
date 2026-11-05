@@ -138,6 +138,27 @@ class ScaledPositionTest(unittest.TestCase):
         self.assertEqual(pos.tolist(), [0.0, 1.0, 1.0, 0.0, 0.0, 0.0])
 
 
+class BootstrapCITest(unittest.TestCase):
+    def test_recentered_ci_contains_point(self):
+        """重定心后 90% CI 应包含全样本点估计（修复未校正百分位偏置）。"""
+        from gate_backtest.bootstrap import mdd_diff_block_bootstrap
+
+        rng = np.random.default_rng(0)
+        idx = pd.bdate_range("2010-01-01", periods=800)
+        # 构造两条相关收益：策略略低波动
+        shock = rng.normal(0.0005, 0.02, size=len(idx))
+        rs = pd.Series(shock * 0.7, index=idx)
+        rb = pd.Series(shock, index=idx)
+        point, lo, hi, diffs = mdd_diff_block_bootstrap(
+            rs, rb, block=20, n_boot=400, seed=1, ci=0.90
+        )
+        self.assertLessEqual(lo, point)
+        self.assertLessEqual(point, hi)
+        # 原始 bootstrap 均值相对点估计的偏置被重定心吸收：CI 半宽与原始百分位半宽同阶
+        raw_lo, raw_hi = np.quantile(diffs, [0.05, 0.95])
+        self.assertAlmostEqual(hi - lo, raw_hi - raw_lo, places=12)
+
+
 class FractionalFeeTest(unittest.TestCase):
     def test_fee_on_delta_not_full_notional(self):
         idx = pd.bdate_range("2020-01-01", periods=5)

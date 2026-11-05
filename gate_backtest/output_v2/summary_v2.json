@@ -12,8 +12,8 @@
   "random_p5": -0.5479008422918252,
   "bootstrap_point": 0.2925842751608724,
   "bootstrap_90ci": [
-    0.03682669732602453,
-    0.2644131010479719
+    0.18500885810843742,
+    0.41259526183038475
   ],
   "criteria": {
     "c1": true,
@@ -73,5 +73,11 @@
       "exposure": 1.0,
       "miss": 0.0
     }
-  }
+  },
+  "bootstrap_ci_method": "recentered_percentile",
+  "bootstrap_raw_mean": 0.14440211437845948,
+  "bootstrap_raw_90ci_before_recenter": [
+    0.03682669732602453,
+    0.2644131010479719
+  ]
 }

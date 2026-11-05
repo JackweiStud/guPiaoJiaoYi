@@ -34,6 +34,12 @@ def mdd_diff_block_bootstrap(
     对 (策略收益, 一直持有收益) 同步分块重采样，
     估计 MDD_strategy - MDD_buyhold 的置信区间。
     注意：MDD 为负或接近负值；差异 = mdd_s - mdd_bh（若策略回撤更浅，差异为正）。
+
+    CI 构造：对 bootstrap 复制做 **均值重定心（recentered percentile）** 后再取分位。
+    原因：对收益分块重采样再 cumprod 得到的路径 MDD 差，相对全样本点估计常有
+    一阶偏置；若直接对原始 bootstrap 分布取百分位，点估计可能落在名义 CI 之外
+    （度量本身一致，并非符号搞反）。重定心后区间宽度不变，但以全样本点估计为中心。
+    返回的第四项仍为**未重定心**的原始 bootstrap 差，便于诊断偏置。
     """
     idx = strategy_returns.index.intersection(buyhold_returns.index)
     rs = strategy_returns.reindex(idx).fillna(0.0).values.astype(float)
@@ -52,7 +58,9 @@ def mdd_diff_block_bootstrap(
         eb = equity_from_returns(rb[take])
         diffs[i] = max_drawdown(pd.Series(es)) - max_drawdown(pd.Series(eb))
 
+    # 重定心：diffs_centered = diffs - mean(diffs) + point
+    centered = diffs - float(np.mean(diffs)) + point
     alpha = (1.0 - ci) / 2.0
-    lo = float(np.quantile(diffs, alpha))
-    hi = float(np.quantile(diffs, 1.0 - alpha))
+    lo = float(np.quantile(centered, alpha))
+    hi = float(np.quantile(centered, 1.0 - alpha))
     return point, lo, hi, diffs
