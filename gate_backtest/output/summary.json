@@ -1,0 +1,20 @@
+{
+  "credit_q": 0.9223560910307899,
+  "credit_tau": 1.8,
+  "combo_mdd": -0.2572497156840292,
+  "bh_mdd": -0.6684923624634829,
+  "random_p5": -0.44458357196558196,
+  "bootstrap_point": 0.41124264677945377,
+  "bootstrap_90ci": [
+    0.10327091326267604,
+    0.49412261448899625
+  ],
+  "criteria": {
+    "c1": true,
+    "c2": true,
+    "c3": false,
+    "pass": false
+  },
+  "n_variants": 13,
+  "robust_stable": false
+}

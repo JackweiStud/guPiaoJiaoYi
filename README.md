@@ -89,6 +89,15 @@ guPiaoJiaoYi/
 - AI 智能总结
 - 邮件推送
 
+### 7. **固定门槛回测** (`gate_backtest/`)
+规则验证（非参数搜索）。预登记见 `PREREG.md`，结果见 `RESULTS.md`。
+
+```bash
+python -m gate_backtest.run
+```
+
+原样数据在 `gate_backtest/data_raw/`；图表在 `gate_backtest/output/`。
+
 ## 📊 监控股票范围
 
 - **A股ETF**：消费、银行、科创50、创业板
