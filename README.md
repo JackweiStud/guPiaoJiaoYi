@@ -89,6 +89,21 @@ guPiaoJiaoYi/
 - AI 智能总结
 - 邮件推送
 
+### 7. **固定门槛回测** (`gate_backtest/`)
+规则验证（非参数搜索）。
+
+- **v1**：三门全开才满仓。预登记 `PREREG.md`，结果 `RESULTS.md`。
+- **v2**：按门数定仓位 + 信用门重算 + 利率绝对水平。预登记 `PREREG_v2.md`，结果 `RESULTS_v2.md`。
+
+```bash
+# v1
+python -m gate_backtest.run
+# v2
+python -m gate_backtest.run_v2
+```
+
+原样数据在 `gate_backtest/data_raw/`；v1 图表在 `gate_backtest/output/`，v2 在 `gate_backtest/output_v2/`。
+
 ## 📊 监控股票范围
 
 - **A股ETF**：消费、银行、科创50、创业板

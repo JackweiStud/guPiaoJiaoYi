@@ -9,6 +9,7 @@ __pycache__/
 stock_data/
 pic/
 webhtml/output/
+gate_backtest/cache/
 
 # 日志文件
 *.log
@@ -63,3 +64,4 @@ build/
 # 特定项目临时文件
 auto_run.log
 stock_data/**/*.log
+gate_backtest/output/*.npy
